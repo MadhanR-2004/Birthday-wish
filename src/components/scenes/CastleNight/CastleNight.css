@@ -1,0 +1,77 @@
+.cn-clouds {
+  --drift-time: 260s;
+  opacity: 0.5;
+  -webkit-mask-image: linear-gradient(to bottom, #000 0%, #000 35%, transparent 72%);
+  mask-image: linear-gradient(to bottom, #000 0%, #000 35%, transparent 72%);
+}
+
+.cn-dark-clouds {
+  --drift-time: 200s;
+  opacity: 0.75;
+  -webkit-mask-image: linear-gradient(to bottom, #000 0%, #000 30%, transparent 60%);
+  mask-image: linear-gradient(to bottom, #000 0%, #000 30%, transparent 60%);
+}
+
+/* the lake is the bottom 29.5% of the scene */
+.cn-ripples {
+  --drift-time: 90s;
+  opacity: 0.35;
+  -webkit-mask-image: linear-gradient(to top, #000 0%, #000 26%, transparent 30%);
+  mask-image: linear-gradient(to top, #000 0%, #000 26%, transparent 30%);
+}
+
+/* mist sitting on the waterline */
+.cn-fog {
+  --drift-time: 150s;
+  opacity: 0.5;
+  -webkit-mask-image: linear-gradient(to top, transparent 14%, #000 26%, #000 34%, transparent 48%);
+  mask-image: linear-gradient(to top, transparent 14%, #000 26%, #000 34%, transparent 48%);
+}
+
+.cn-crag {
+  fill: none;
+  stroke: rgba(3, 5, 12, 0.6);
+  stroke-width: 3;
+  stroke-linejoin: round;
+}
+
+.cn-window {
+  animation: glow-flicker 3s ease-in-out infinite;
+}
+
+.broom-flight {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: clamp(110px, 13vw, 170px);
+  animation: broom-fly 20s linear infinite;
+}
+
+.broom-riders {
+  display: block;
+  width: 100%;
+  fill: #04060d;
+  stroke: #04060d;
+  animation: broom-bob 2.6s ease-in-out infinite;
+}
+
+@keyframes broom-fly {
+  0% { transform: translate(-25vw, 30vh) rotate(-4deg); }
+  100% { transform: translate(110vw, 4vh) rotate(-8deg); }
+}
+
+@keyframes broom-bob {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(6px); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cn-window,
+  .broom-riders {
+    animation: none;
+  }
+  .broom-flight {
+    animation: none;
+    transform: translate(18vw, 14vh) rotate(-6deg);
+  }
+}

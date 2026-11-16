@@ -1,0 +1,81 @@
+/* Light layers brighten whatever is underneath, like real light */
+.gh-light-layer {
+  mix-blend-mode: screen;
+}
+
+.gh-mortar {
+  stroke: rgba(10, 6, 8, 0.45);
+  stroke-width: 2.5;
+}
+
+.gh-floor-joint {
+  stroke: rgba(8, 5, 6, 0.5);
+  stroke-width: 2;
+}
+
+.gh-lead {
+  fill: none;
+  stroke: #120d10;
+  stroke-width: 5;
+}
+
+.gh-lead.thin {
+  stroke-width: 2.5;
+}
+
+.gh-rib {
+  fill: none;
+  stroke: #3a3038;
+  stroke-linecap: round;
+}
+
+/* warm light catching the underside of each rib */
+.gh-rib-light {
+  fill: none;
+  stroke: rgba(255, 170, 90, 0.18);
+  stroke-linecap: round;
+}
+
+.gh-ridge {
+  fill: none;
+  stroke: #2a2228;
+  stroke-width: 7;
+}
+
+.gh-glow {
+  animation: glow-flicker 2.8s ease-in-out infinite;
+}
+
+.gh-flame {
+  animation: gh-flame-dance 0.9s ease-in-out infinite alternate;
+}
+
+.gh-dust span {
+  position: absolute;
+  border-radius: 50%;
+  background: rgba(255, 210, 150, 0.55);
+  box-shadow: 0 0 6px rgba(255, 190, 120, 0.6);
+  animation: gh-dust-drift linear infinite;
+}
+
+@keyframes gh-flame-dance {
+  from { transform: scale(1, 1) skewX(-2deg); }
+  to { transform: scale(0.92, 1.08) skewX(3deg); }
+}
+
+@keyframes gh-dust-drift {
+  0% { transform: translate(0, 0); opacity: 0; }
+  15% { opacity: 1; }
+  85% { opacity: 1; }
+  100% { transform: translate(40px, -260px); opacity: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .gh-glow,
+  .gh-flame {
+    animation: none;
+  }
+  .gh-dust {
+    display: none;
+  }
+}

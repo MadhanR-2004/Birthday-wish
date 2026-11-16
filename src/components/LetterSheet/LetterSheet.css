@@ -1,0 +1,177 @@
+.letter-sheet-shadow {
+  width: min(640px, 100%);
+  filter: drop-shadow(0 30px 40px rgba(0, 0, 0, 0.55));
+  transform-origin: top center;
+  animation: letter-unfold 1s cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+
+.letter-sheet {
+  position: relative;
+  padding: 64px 56px 56px;
+  color: #3a2a1a;
+}
+
+/* everything written on the letter sits above the paper layer */
+.letter-sheet > :not(.letter-paper) {
+  position: relative;
+}
+
+.letter-paper {
+  position: absolute;
+  inset: 0;
+  --tint: rgba(255, 250, 236, 0.4);
+  /* ragged, burnt edges (see BurntEdgesFilter.jsx) */
+  filter: url(#burnt-edges);
+}
+
+/* the creases from being folded in three */
+.letter-paper::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(to bottom, transparent 32.9%, rgba(90, 60, 25, 0.18) 33.2%, rgba(255, 252, 240, 0.45) 33.5%, transparent 34%),
+    linear-gradient(to bottom, transparent 66.2%, rgba(90, 60, 25, 0.18) 66.5%, rgba(255, 252, 240, 0.45) 66.8%, transparent 67.3%);
+}
+
+.letter-sheet .kicker,
+.envelope-letter .kicker {
+  margin: 0 0 10px;
+  color: #6b4423;
+}
+
+.letter-heading {
+  margin: 0 0 22px;
+  color: #3a2414;
+  font-family: "Homemade Apple", "IM Fell English", cursive;
+  font-size: clamp(1.15rem, 3.4vw, 1.6rem);
+  font-weight: 400;
+  text-shadow: 0 0 0.6px rgba(58, 36, 20, 0.6);
+}
+
+.envelope-letter .letter-heading {
+  font-size: clamp(0.8rem, 2.6vw, 1.25rem);
+}
+
+.envelope-letter .kicker {
+  font-size: clamp(7px, 1.6vw, 11pt);
+}
+
+.letter-sheet p {
+  color: #3a2414;
+  font-family: "Homemade Apple", "IM Fell English", cursive;
+  font-size: clamp(0.88rem, 2.2vw, 1.02rem);
+  line-height: 2.2;
+  text-shadow: 0 0 0.6px rgba(58, 36, 20, 0.6);
+}
+
+/* the small red label stays in print, not handwriting */
+.letter-sheet .kicker {
+  font-family: var(--font-label);
+  font-size: 11pt;
+  line-height: 1.4;
+  text-shadow: none;
+}
+
+.letter-sheet .signature {
+  margin-top: 30px;
+  text-align: right;
+}
+
+/* ---------- The curled corner that sends the letter away ---------- */
+
+.letter-sheet .letter-corner {
+  position: absolute;
+  right: 26px;
+  bottom: 26px;
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  padding: 0;
+  border: none;
+  background: none;
+  cursor: pointer;
+}
+
+.letter-corner-hint {
+  margin-bottom: 4px;
+  color: #6b4423;
+  font-family: "Homemade Apple", "IM Fell English", cursive;
+  font-size: 0.8rem;
+  opacity: 0.75;
+  transition: opacity 0.3s;
+}
+
+/* the paper's corner folded up, showing its paler back */
+.letter-corner-curl {
+  width: 44px;
+  height: 44px;
+  background: linear-gradient(135deg, #fbf3df 0%, #ead8b0 46%, #c9ab73 50%, transparent 50.5%);
+  border-top-left-radius: 6px;
+  filter: drop-shadow(-3px -3px 4px rgba(60, 35, 10, 0.35));
+  transform-origin: bottom right;
+  transition: transform 0.3s ease;
+  animation: corner-lift 2.6s ease-in-out infinite;
+}
+
+.letter-corner:hover .letter-corner-curl,
+.letter-corner:focus-visible .letter-corner-curl {
+  transform: scale(1.25) rotate(-4deg);
+  animation: none;
+}
+
+.letter-corner:hover .letter-corner-hint {
+  opacity: 1;
+}
+
+.letter-corner:focus-visible {
+  outline: 2px solid #6b4423;
+  outline-offset: 4px;
+}
+
+.letter-corner:disabled {
+  cursor: default;
+}
+
+/* lifting, fluttering and sailing off into the sky */
+.letter-sheet-shadow.is-flying {
+  animation: letter-fly-away 2.8s cubic-bezier(0.45, 0, 0.6, 1) forwards;
+}
+
+.is-flying .letter-corner {
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+
+@keyframes letter-fly-away {
+  0% { transform: none; opacity: 1; }
+  12% { transform: perspective(1200px) translateY(10px) rotateX(8deg) rotate(-1.5deg) scale(0.98); }
+  32% { transform: perspective(1200px) translate(5vw, -12vh) rotateX(-18deg) rotateY(12deg) rotate(5deg) scale(0.86); }
+  52% { transform: perspective(1200px) translate(-4vw, -36vh) rotateX(22deg) rotateY(-16deg) rotate(-9deg) scale(0.68); }
+  74% { transform: perspective(1200px) translate(16vw, -66vh) rotateX(-20deg) rotateY(20deg) rotate(14deg) scale(0.48); opacity: 0.9; }
+  100% { transform: perspective(1200px) translate(38vw, -115vh) rotateX(30deg) rotateY(-24deg) rotate(30deg) scale(0.28); opacity: 0; }
+}
+
+@keyframes corner-lift {
+  0%, 100% { transform: none; }
+  50% { transform: scale(1.12) rotate(-3deg); }
+}
+
+@keyframes letter-unfold {
+  0% { opacity: 0; transform: perspective(1400px) rotateX(78deg) scaleY(0.34) translateY(40px); }
+  35% { opacity: 1; }
+  100% { opacity: 1; transform: none; }
+}
+
+@media (max-width: 600px) {
+  .letter-sheet {
+    padding: 48px 30px 44px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .letter-sheet-shadow,
+  .letter-corner-curl {
+    animation: none;
+  }
+}

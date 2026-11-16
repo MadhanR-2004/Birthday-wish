@@ -1,0 +1,52 @@
+.scene-switcher {
+  position: fixed;
+  top: 16px;
+  right: 16px;
+  z-index: 10;
+  display: flex;
+  gap: 4px;
+  padding: 4px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 999px;
+  background: rgba(17, 17, 20, 0.6);
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
+}
+
+.scene-option {
+  padding: 8px 16px;
+  border: none;
+  border-radius: 999px;
+  background: transparent;
+  color: #d6d6dc;
+  font: 600 0.78rem var(--font-label);
+  letter-spacing: 1.5px;
+  cursor: pointer;
+  transition: background 0.2s, color 0.2s;
+}
+
+.scene-option:hover {
+  color: var(--white);
+}
+
+.scene-option[aria-pressed="true"] {
+  background: #2f56c8;
+  color: var(--white);
+}
+
+.scene-option:focus-visible {
+  outline: 2px solid var(--white);
+  outline-offset: 2px;
+}
+
+@media (max-width: 600px) {
+  .scene-switcher {
+    top: 12px;
+    right: 50%;
+    transform: translateX(50%);
+  }
+  .scene-option {
+    padding: 7px 12px;
+    font-size: 0.7rem;
+  }
+}
