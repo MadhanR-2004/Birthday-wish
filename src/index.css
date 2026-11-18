@@ -129,9 +129,143 @@ h2 {
   outline-offset: 3px;
 }
 
+.read-again-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 12px;
+}
+
+.read-again-button.is-secondary {
+  background: rgba(17, 17, 20, 0.7);
+}
+
+.read-again-button.is-secondary:hover {
+  background: rgba(28, 28, 32, 0.9);
+}
+
+/* ---------- The opening: the owl on her way to the tower ---------- */
+
+.stage.opening {
+  justify-content: flex-end;
+  padding-bottom: clamp(48px, 9vh, 96px);
+  pointer-events: none;
+}
+
+.opening-card {
+  max-width: 640px;
+  text-align: center;
+  pointer-events: auto;
+  animation: appear 1.6s ease-out 0.6s both;
+}
+
+.opening-kicker {
+  margin: 0 0 10px;
+  color: #e9cf96;
+  font: 600 0.8rem var(--font-label);
+  letter-spacing: 4px;
+  text-transform: uppercase;
+  text-shadow: 0 2px 10px rgba(0, 0, 0, 0.9);
+}
+
+.opening-title {
+  margin: 0;
+  color: #fff4dc;
+  font: 400 clamp(1.8rem, 5vw, 3.2rem)/1.5 "Homemade Apple", var(--font-story), cursive;
+  text-shadow: 0 0 18px rgba(255, 200, 120, 0.55), 0 3px 14px rgba(0, 0, 0, 0.9);
+}
+
+.opening-text {
+  margin: 6px 0 24px;
+  color: #efe4cc;
+  font: italic clamp(1rem, 2.4vw, 1.25rem) var(--font-story);
+  text-shadow: 0 2px 10px rgba(0, 0, 0, 0.95);
+}
+
+.opening-button {
+  padding: 14px 32px;
+  border: 1px solid rgba(255, 226, 160, 0.6);
+  border-radius: 999px;
+  background: linear-gradient(180deg, #e3b65c, #b98632);
+  color: #1d1206;
+  font: 700 0.9rem var(--font-label);
+  letter-spacing: 2px;
+  box-shadow: 0 0 24px rgba(233, 180, 90, 0.45), 0 10px 28px rgba(0, 0, 0, 0.5);
+  cursor: pointer;
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.opening-button:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 0 34px rgba(233, 180, 90, 0.7), 0 12px 30px rgba(0, 0, 0, 0.5);
+}
+
+.opening-button:focus-visible {
+  outline: 2px solid #fff4dc;
+  outline-offset: 3px;
+}
+
+/* ---------- The way into the memory basin ---------- */
+
+.memory-entry {
+  position: fixed;
+  top: 16px;
+  left: 16px;
+  z-index: 10;
+  padding: 9px 18px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 999px;
+  background: rgba(17, 17, 20, 0.6);
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
+  color: #e2e2e6;
+  font: 600 0.78rem var(--font-label);
+  letter-spacing: 1.5px;
+  cursor: pointer;
+  transition: color 0.2s, border-color 0.2s;
+}
+
+.memory-entry span {
+  color: #6fd6f5;
+  text-shadow: 0 0 8px rgba(60, 200, 240, 0.9);
+}
+
+.memory-entry:hover {
+  border-color: rgba(255, 255, 255, 0.35);
+  color: var(--white);
+}
+
+.memory-entry:focus-visible {
+  outline: 2px solid var(--white);
+  outline-offset: 2px;
+}
+
+/* the tower room button sits just below the memory basin one */
+.room-entry {
+  top: 62px;
+}
+
+/* Shown for a moment while the basin's code downloads. */
+.memory-loading {
+  position: fixed;
+  inset: 0;
+  background: #04060c;
+}
+
 @media (max-width: 600px) {
   .envelope-hint {
     margin-top: 64px;
+  }
+  .memory-entry {
+    top: auto;
+    bottom: 16px;
+    left: 50%;
+    transform: translateX(-50%);
+    padding: 8px 16px;
+    font-size: 0.7rem;
+  }
+  .room-entry {
+    bottom: 58px;
   }
 }
 

@@ -8,6 +8,9 @@ export const BIRTHDAY = {
   // The birthday person's name, used on the envelope and in the letter.
   name: "Someone",
 
+  // The owl who delivers the letter (in the tower room she's named).
+  owlName: "Hedwig",
+
   seal: {
     // Letters pressed into the wax seal: 1 to 3 characters, e.g. "S", "SM", "RJK".
     // Leave empty ("") to use the first letter of the name.
@@ -30,4 +33,51 @@ export const BIRTHDAY = {
     ],
     signature: "Written by moonlight, with all our magic",
   },
+
+  // Memories of the two of you. They come back one by one in the tower room
+  // (each spell you cast brings back the next one) and live in the stone
+  // memory basin too. Add, remove or reorder as you like.
+  // Pictures: put photos in the "public/memories" folder next to "src" and list
+  // them, e.g. pictures: ["/memories/beach.jpg", "/memories/cake.jpg"].
+  // The ones there now are drawn placeholders; swap in your real photos any time.
+  memories: [
+    {
+      title: "The night we met",
+      when: "Where it all began",
+      pictures: ["/memories/star-tower.jpg", "/memories/owls.jpg"],
+      paragraphs: [
+        "I still remember the first thing you said to me, and how I forgot every clever thing I'd planned to say back.",
+        "We talked until the sky went dark and the stars came out, and I didn't want the night to end.",
+        "Somewhere in the middle of it, without either of us noticing, everything changed.",
+      ],
+    },
+    {
+      title: "Our first summer",
+      when: "Warm evenings, long ago",
+      pictures: ["/memories/fireflies.jpg", "/memories/roses.jpg", "/memories/teapot.jpg"],
+      paragraphs: [
+        "A garden full of fireflies, your hand finding mine, and neither of us saying a word for a while.",
+        "You laughed at something silly I did, and I decided right then that I wanted to hear that laugh for the rest of my life.",
+      ],
+    },
+    {
+      title: "Our first winter",
+      when: "Snow on the windows",
+      pictures: ["/memories/snow-forts.jpg", "/memories/fireside.jpg"],
+      paragraphs: [
+        "Cold noses, a snowball fight you definitely started, and a surrender I definitely didn't mean.",
+        "Afterwards we sat by the fire with hot chocolate, wrapped in one blanket, and the whole world felt very small and very warm.",
+      ],
+    },
+    {
+      title: "Tonight",
+      when: "Right now",
+      pictures: ["/memories/torches.jpg", "/memories/cake.jpg"],
+      paragraphs: [
+        "This one is still being made. The candles are lit, the letter is waiting, and I'm thinking of you.",
+        "Of all my favourite memories, every single one has you in it, {name}.",
+        "Happy birthday, my love.",
+      ],
+    },
+  ],
 };

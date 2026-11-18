@@ -1,0 +1,74 @@
+/* The owl and the envelope it carries. Positions are driven from
+   OwlCarrier.jsx; these rules set up the boxes they move. */
+
+.owl-carrier {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  transform-origin: 50% 0;
+}
+
+.owl-carrier.is-waiting {
+  visibility: hidden;
+}
+
+.owl-carrier.is-carried {
+  will-change: transform;
+}
+
+/* Same width as the envelope, so the owl can be sized from it (cqw units). */
+.owl-envelope-box {
+  position: relative;
+  width: min(620px, 88vw);
+  container-type: inline-size;
+}
+
+/* The envelope hangs from its top-centre, where the talons grip it. */
+.owl-swing {
+  transform-origin: 50% 0;
+}
+
+/* The owl's canvas sits above the envelope; the grip point in the 3D scene
+   lands on the envelope's top edge (see GRIP_NDC in owlScene.js). */
+.owl-host {
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% - 3.6cqw);
+  z-index: 2;
+  width: 200cqw;
+  height: 120cqw;
+  transform: translateX(-50%);
+  pointer-events: none;
+}
+
+.owl-host canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+/* Letting go: the owl climbs away into the sky. */
+.owl-host.is-leaving {
+  opacity: 0;
+  transform: translate(-20%, -110vh) scale(0.4);
+  transition:
+    transform 1.7s cubic-bezier(0.55, 0, 0.8, 0.4),
+    opacity 1.2s ease-in 0.5s;
+}
+
+/* While carried, the envelope hangs still in the owl's grip instead of
+   drifting on its own, and casts no shadow on the far-away ground. */
+.owl-carrier.is-carried .envelope-float {
+  animation: none;
+  transform: rotateX(6deg) rotateY(-5deg);
+}
+
+.envelope-ground-shadow {
+  transition: opacity 1s;
+}
+
+.owl-carrier.is-carried .envelope-ground-shadow {
+  animation: none;
+  opacity: 0;
+}

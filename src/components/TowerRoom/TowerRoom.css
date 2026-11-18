@@ -1,0 +1,384 @@
+/* The tower room page: few, clear controls in the letter's fonts (Cinzel
+   labels, IM Fell English text) on dark glass, candlelight gold for the main
+   action. Laid out the same on phones, just narrower. */
+
+.tower-room {
+  --tr-panel: rgba(14, 12, 12, 0.72);
+  --tr-line: rgba(233, 207, 150, 0.22);
+  --tr-text: #f1e8d6;
+  --tr-muted: #cbbfa7;
+  --tr-gold: #e9cf96;
+
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  background: #05060c;
+  color: var(--tr-text);
+  font-family: var(--font-story);
+}
+
+.tr-canvas {
+  position: absolute;
+  inset: 0;
+  touch-action: none;
+}
+
+.tr-webgl {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.is-ready .tr-canvas {
+  animation: tr-fade-in 1.6s ease-out both;
+}
+
+/* ---------- loading ---------- */
+
+.tr-loading {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-content: center;
+  gap: 8px;
+  text-align: center;
+  background: radial-gradient(circle at 50% 45%, #1b1410, #05060c 70%);
+}
+
+.tr-loading-title {
+  margin: 0;
+  font: 600 1rem var(--font-label);
+  letter-spacing: 3px;
+  color: var(--tr-gold);
+  animation: tr-breathe 1.8s ease-in-out infinite;
+}
+
+.tr-loading-note {
+  margin: 0;
+  color: var(--tr-muted);
+}
+
+.tr-progress {
+  width: min(260px, 70vw);
+  height: 3px;
+  margin: 10px auto 0;
+  overflow: hidden;
+  border-radius: 2px;
+  background: rgba(233, 207, 150, 0.15);
+}
+
+.tr-progress span {
+  display: block;
+  height: 100%;
+  background: var(--tr-gold);
+  transition: width 0.3s;
+}
+
+/* ---------- buttons ---------- */
+
+.tr-round,
+.tr-pill {
+  border: 1px solid var(--tr-line);
+  background: var(--tr-panel);
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
+  color: var(--tr-text);
+  cursor: pointer;
+  transition: border-color 0.2s, background 0.2s, box-shadow 0.2s;
+}
+
+.tr-round {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  font-size: 1.15rem;
+  line-height: 1;
+}
+
+.tr-pill {
+  min-height: 40px;
+  padding: 0 18px;
+  border-radius: 999px;
+  font: 600 0.74rem var(--font-label);
+  letter-spacing: 1.4px;
+}
+
+.tr-round:hover,
+.tr-pill:hover {
+  border-color: rgba(233, 207, 150, 0.6);
+}
+
+/* the main action: candlelight gold */
+.tr-pill.is-gold {
+  border-color: rgba(255, 226, 160, 0.6);
+  background: linear-gradient(180deg, #e3b65c, #b98632);
+  color: #1d1206;
+  box-shadow: 0 0 18px rgba(233, 180, 90, 0.35);
+}
+
+.tr-pill.is-gold:hover {
+  background: linear-gradient(180deg, #f0c66c, #c8933a);
+}
+
+.tr-round:focus-visible,
+.tr-pill:focus-visible {
+  outline: 2px solid var(--tr-gold);
+  outline-offset: 2px;
+}
+
+.tr-back {
+  position: absolute;
+  top: 16px;
+  left: 16px;
+  z-index: 4;
+}
+
+.tr-top-right {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* ---------- narration: one short line under the top bar ---------- */
+
+.tr-narration {
+  position: absolute;
+  top: 72px;
+  left: 50%;
+  z-index: 2;
+  width: min(560px, calc(100% - 32px));
+  margin: 0;
+  transform: translateX(-50%);
+  color: var(--tr-text);
+  font-size: clamp(0.98rem, 2.2vw, 1.2rem);
+  font-style: italic;
+  line-height: 1.4;
+  text-align: center;
+  text-shadow: 0 2px 12px rgba(0, 0, 0, 0.95), 0 0 2px rgba(0, 0, 0, 0.9);
+  transition: opacity 0.8s;
+  pointer-events: none;
+}
+
+.tr-narration.is-hidden {
+  opacity: 0;
+}
+
+/* ---------- what's under the mouse ---------- */
+
+.tr-tooltip {
+  position: fixed;
+  z-index: 5;
+  padding: 5px 10px;
+  border: 1px solid var(--tr-line);
+  border-radius: 8px;
+  background: rgba(14, 12, 12, 0.85);
+  color: var(--tr-gold);
+  font: 600 0.72rem var(--font-label);
+  letter-spacing: 1px;
+  white-space: nowrap;
+  transform: translate(14px, 14px);
+  pointer-events: none;
+}
+
+/* ---------- bottom: the story strip, or a tip / the wand strip ---------- */
+
+.tr-bottom {
+  position: absolute;
+  left: 50%;
+  bottom: 16px;
+  z-index: 3;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  width: min(420px, calc(100% - 24px));
+  transform: translateX(-50%);
+}
+
+.tr-tip {
+  margin: 0;
+  padding: 8px 14px;
+  border-radius: 999px;
+  background: rgba(14, 12, 12, 0.6);
+  color: var(--tr-gold);
+  font: 600 0.72rem var(--font-label);
+  letter-spacing: 1.2px;
+  text-align: center;
+  animation: tr-rise 0.4s ease-out both, tr-breathe 2.4s ease-in-out 0.4s infinite;
+}
+
+.tr-wandbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 6px 6px 6px 16px;
+  border: 1px solid rgba(233, 207, 150, 0.45);
+  border-radius: 999px;
+  background: var(--tr-panel);
+  color: var(--tr-text);
+  font-size: 0.95rem;
+}
+
+.tr-wandbar strong {
+  color: var(--tr-gold);
+  font-weight: 600;
+}
+
+/* ---------- the story strip: one instruction at a time ---------- */
+
+.tr-story {
+  width: 100%;
+  padding: 12px 16px 10px;
+  border: 1px solid rgba(233, 207, 150, 0.35);
+  border-radius: 16px;
+  background: var(--tr-panel);
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
+  text-align: center;
+  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.45);
+}
+
+.tr-steps {
+  display: flex;
+  justify-content: center;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.tr-steps span {
+  width: 22px;
+  height: 3px;
+  border-radius: 2px;
+  background: rgba(233, 207, 150, 0.2);
+  transition: background 0.4s;
+}
+
+.tr-steps span.is-done {
+  background: rgba(233, 207, 150, 0.6);
+}
+
+.tr-steps span.is-now {
+  background: var(--tr-gold);
+  box-shadow: 0 0 8px rgba(233, 207, 150, 0.7);
+}
+
+.tr-story-text {
+  margin: 0 0 8px;
+  color: var(--tr-text);
+  font-size: 1.05rem;
+  line-height: 1.4;
+  transition: opacity 0.4s;
+}
+
+.tr-story-text.is-waiting {
+  opacity: 0;
+}
+
+.tr-story-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+}
+
+.tr-skip {
+  padding: 6px 8px;
+  border: none;
+  background: transparent;
+  color: var(--tr-muted);
+  font: 600 0.66rem var(--font-label);
+  letter-spacing: 1.2px;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+  opacity: 0.75;
+}
+
+.tr-skip:hover {
+  opacity: 1;
+}
+
+.tr-skip:focus-visible {
+  outline: 2px solid var(--tr-gold);
+  outline-offset: 2px;
+}
+
+.tr-choices {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+  margin: 2px 0 8px;
+}
+
+.tr-choice {
+  border-color: rgba(233, 207, 150, 0.55);
+  color: var(--tr-gold);
+  animation: tr-rise 0.4s ease-out both;
+}
+
+.tr-choice:hover {
+  background: rgba(233, 207, 150, 0.14);
+}
+
+/* ---------- reading the letter, over the room ---------- */
+
+.tr-reading {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  overflow-y: auto;
+  background: radial-gradient(ellipse at 50% 50%, rgba(8, 6, 4, 0.35), rgba(4, 4, 10, 0.78) 75%);
+  animation: tr-fade-in 0.6s ease-out both;
+}
+
+@keyframes tr-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes tr-rise {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes tr-breathe {
+  0%, 100% { opacity: 0.6; }
+  50% { opacity: 1; }
+}
+
+@media (max-width: 600px) {
+  .tr-back {
+    top: 12px;
+    left: 12px;
+  }
+  .tr-top-right {
+    top: 12px;
+    right: 12px;
+  }
+  .tr-narration {
+    top: 66px;
+  }
+  .tr-bottom {
+    bottom: 12px;
+  }
+  .tr-wandbar {
+    font-size: 0.88rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .is-ready .tr-canvas,
+  .tr-tip,
+  .tr-loading-title,
+  .tr-choice {
+    animation: none;
+  }
+}

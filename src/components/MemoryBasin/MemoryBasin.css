@@ -1,0 +1,363 @@
+/* The memory basin page: the letter's own fonts (Homemade Apple handwriting,
+   Cinzel labels) in glowing blue, over dark glassy panels. */
+
+.memory-basin {
+  --mb-text: #dcf6ff;
+  --mb-blue: #6fd6f5;
+  --mb-blue-deep: #136d93;
+  --mb-glow: 0 0 10px rgba(60, 200, 240, 0.9), 0 0 26px rgba(30, 150, 210, 0.55);
+  --mb-glow-soft: 0 0 8px rgba(60, 200, 240, 0.6);
+  --mb-line: rgba(120, 220, 245, 0.18);
+  --mb-hand: "Homemade Apple", var(--font-story), cursive;
+
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  background: #01060a;
+  color: var(--mb-text);
+  font-family: var(--font-story);
+}
+
+.mb-canvas {
+  position: absolute;
+  inset: 0;
+  animation: mb-fade-in 1.6s ease-out both;
+}
+
+.mb-webgl {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+/* No WebGL: a soft blue glow stands in for the basin. */
+.no-webgl .mb-canvas {
+  background:
+    radial-gradient(40% 28% at 50% 42%, rgba(50, 200, 230, 0.4), transparent 70%),
+    radial-gradient(70% 60% at 50% 45%, rgba(8, 60, 80, 0.6), transparent 75%);
+  transition: filter 0.7s, opacity 0.7s;
+}
+
+.no-webgl.phase-diving .mb-canvas,
+.no-webgl.phase-remembering .mb-canvas {
+  filter: blur(30px) brightness(1.6);
+}
+
+/* ---------- back button ---------- */
+
+.mb-leave {
+  position: absolute;
+  top: 16px;
+  left: 16px;
+  z-index: 3;
+  padding: 9px 18px;
+  border: 1px solid var(--mb-line);
+  border-radius: 999px;
+  background: rgba(4, 16, 22, 0.6);
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
+  color: var(--mb-text);
+  font: 600 0.78rem var(--font-label);
+  letter-spacing: 1.5px;
+  text-shadow: var(--mb-glow-soft);
+  cursor: pointer;
+  transition: opacity 0.6s, border-color 0.2s, box-shadow 0.2s;
+}
+
+.mb-leave:hover {
+  border-color: rgba(120, 220, 245, 0.45);
+  box-shadow: 0 0 18px rgba(60, 200, 240, 0.3);
+}
+
+.mb-leave[inert] {
+  opacity: 0;
+}
+
+.mb-leave.mb-explore {
+  left: auto;
+  right: 16px;
+}
+
+/* on narrow phones the two buttons share the top: shorter labels */
+@media (max-width: 520px) {
+  .mb-leave {
+    padding: 8px 14px;
+  }
+  .mb-leave .mb-wide {
+    display: none;
+  }
+}
+
+/* ---------- choosing a memory ---------- */
+
+.mb-picker {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 80px 16px 28px;
+  background: linear-gradient(transparent, rgba(1, 6, 10, 0.85) 45%);
+  text-align: center;
+  transition: opacity 0.8s ease, transform 0.8s ease;
+  /* "backwards" only, so the animation never overrides the hidden state below */
+  animation: mb-rise-in 1.2s ease-out 0.4s backwards;
+}
+
+.mb-picker[inert] {
+  opacity: 0;
+  transform: translateY(24px);
+}
+
+.mb-kicker {
+  margin: 0 0 8px;
+  color: var(--mb-blue);
+  font-family: var(--font-label);
+  font-size: 0.8rem;
+  letter-spacing: 3px;
+  text-shadow: var(--mb-glow-soft);
+}
+
+.mb-title {
+  margin: 0 0 22px;
+  color: var(--mb-text);
+  font: 400 clamp(1.1rem, 2.6vw, 1.6rem)/1.6 var(--mb-hand);
+  text-shadow: var(--mb-glow);
+}
+
+.mb-memories {
+  display: flex;
+  gap: 12px;
+  max-width: 100%;
+  margin: 0;
+  padding: 6px 4px 10px;
+  overflow-x: auto;
+  list-style: none;
+  scroll-snap-type: x mandatory;
+  scrollbar-width: thin;
+}
+
+.mb-memories li {
+  flex: none;
+  scroll-snap-align: center;
+}
+
+.mb-memory {
+  position: relative;
+  display: flex;
+  align-items: center;
+  width: 240px;
+  height: 100%;
+  padding: 14px 16px;
+  overflow: hidden;
+  border: 1px solid var(--mb-line);
+  border-radius: 12px;
+  background: rgba(4, 16, 22, 0.7);
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.45);
+  color: var(--mb-text);
+  text-align: left;
+  cursor: pointer;
+  transition: transform 0.25s, border-color 0.25s, background 0.25s, box-shadow 0.25s;
+}
+
+.mb-memory:hover,
+.mb-memory:focus-visible {
+  transform: translateY(-4px);
+  border-color: rgba(120, 220, 245, 0.5);
+  background: rgba(6, 26, 34, 0.88);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.55), 0 0 30px rgba(60, 200, 240, 0.28);
+}
+
+.mb-memory:focus-visible {
+  outline: 2px solid var(--mb-blue);
+  outline-offset: 3px;
+}
+
+/* Large faint number behind each card. */
+.mb-memory-number {
+  position: absolute;
+  right: 10px;
+  bottom: -12px;
+  color: rgba(110, 210, 240, 0.08);
+  font: 700 3rem var(--font-title);
+  pointer-events: none;
+}
+
+.mb-memory-when {
+  display: block;
+  color: var(--mb-blue);
+  font: 600 0.66rem var(--font-label);
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+}
+
+.mb-memory-title {
+  display: block;
+  margin-top: 4px;
+  font: 400 0.82rem/1.7 var(--mb-hand);
+  text-shadow: var(--mb-glow-soft);
+}
+
+/* ---------- inside a memory ---------- */
+
+.mb-memory-view {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  display: flex;
+  overflow-x: hidden;
+  overflow-y: auto;
+  padding: 64px 16px;
+  animation: mb-fade-in 1.4s ease-out both;
+}
+
+.mb-memory-view.is-leaving {
+  animation: mb-fade-out 0.9s ease-in both;
+}
+
+.mb-memory-inner {
+  position: relative;
+  width: min(680px, 100%);
+  margin: auto;
+  padding: 8px 4px;
+  /* a soft pool of darkness so the words stay readable over the mist */
+  background: radial-gradient(60% 55% at 50% 50%, rgba(1, 6, 10, 0.5), transparent 80%);
+}
+
+/* Sparkles rising off the words (drawn by TextSparkles.jsx). */
+.mb-sparkles {
+  position: absolute;
+  inset: -80px -40px -20px;
+  width: calc(100% + 80px);
+  height: calc(100% + 100px);
+  pointer-events: none;
+}
+
+.mb-memory-photo {
+  margin: 0 auto 28px;
+  width: min(560px, 100%);
+  aspect-ratio: 4 / 3;
+  -webkit-mask-image: radial-gradient(closest-side, #000 55%, transparent 100%);
+  mask-image: radial-gradient(closest-side, #000 55%, transparent 100%);
+  animation: mb-photo-in 2.4s ease-out both;
+}
+
+.mb-memory-photo img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  filter: saturate(0.6) brightness(1.05) drop-shadow(0 0 30px rgba(60, 200, 240, 0.4));
+  animation: mb-photo-drift 16s ease-in-out infinite alternate;
+}
+
+.mb-memory-heading {
+  position: relative;
+  margin: 0 0 26px;
+  color: var(--mb-text);
+  font: 400 clamp(1.4rem, 3.8vw, 2.1rem)/1.6 var(--mb-hand);
+  text-shadow: var(--mb-glow);
+  animation: mb-line-in 1.8s ease-out both;
+}
+
+.mb-memory-heading:focus {
+  outline: none;
+}
+
+.mb-memory-line {
+  position: relative;
+  margin: 0 0 18px;
+  color: var(--mb-text);
+  font: 400 clamp(0.88rem, 2.2vw, 1.02rem)/2.1 var(--mb-hand);
+  text-shadow: var(--mb-glow);
+  animation: mb-line-in 1.8s ease-out both;
+}
+
+.mb-button {
+  margin-top: 18px;
+  padding: 13px 30px;
+  border: 1px solid rgba(120, 220, 245, 0.4);
+  border-radius: 999px;
+  background: linear-gradient(180deg, #1f9fc8, var(--mb-blue-deep));
+  color: #fff;
+  font: 600 0.82rem var(--font-label);
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.5), 0 0 22px rgba(60, 200, 240, 0.45);
+  cursor: pointer;
+  transition: box-shadow 0.2s, transform 0.2s;
+  animation: mb-fade-in 1s ease-out 2.4s both;
+}
+
+.mb-button:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.5), 0 0 32px rgba(60, 200, 240, 0.8);
+}
+
+.mb-button:focus-visible,
+.mb-leave:focus-visible {
+  outline: 2px solid var(--mb-blue);
+  outline-offset: 3px;
+}
+
+/* ---------- animations ---------- */
+
+@keyframes mb-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes mb-fade-out {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+
+@keyframes mb-rise-in {
+  from { opacity: 0; transform: translateY(24px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes mb-line-in {
+  from { opacity: 0; filter: blur(8px); transform: translateY(8px); }
+  to { opacity: 1; filter: blur(0); transform: translateY(0); }
+}
+
+@keyframes mb-photo-in {
+  from { opacity: 0; filter: blur(16px); transform: scale(1.08); }
+  to { opacity: 1; filter: blur(0); transform: scale(1); }
+}
+
+@keyframes mb-photo-drift {
+  from { transform: scale(1.02) translate(-1%, 0); }
+  to { transform: scale(1.08) translate(1%, -1%); }
+}
+
+@media (max-width: 600px) {
+  .mb-picker {
+    padding-bottom: 18px;
+  }
+  .mb-memory {
+    width: 230px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mb-canvas,
+  .mb-picker,
+  .mb-memory-view,
+  .mb-memory-photo,
+  .mb-memory-heading,
+  .mb-memory-line,
+  .mb-button {
+    animation-duration: 0.01s;
+    animation-delay: 0s !important;
+  }
+  .mb-memory-photo img {
+    animation: none;
+  }
+}
