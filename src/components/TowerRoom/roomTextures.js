@@ -413,96 +413,6 @@ function bookSpines(fine) {
   });
 }
 
-// Brass-and-crimson banner with a gold star, fringed at the bottom.
-function banner(fine) {
-  const W = 512;
-  const H = 1024;
-  const canvas = makeCanvas(W, H);
-  const c = canvas.getContext("2d");
-  c.fillStyle = "#73101a";
-  c.beginPath();
-  c.moveTo(0, 0);
-  c.lineTo(W, 0);
-  c.lineTo(W, H * 0.86);
-  c.lineTo(W / 2, H * 0.97);
-  c.lineTo(0, H * 0.86);
-  c.closePath();
-  c.fill();
-  c.strokeStyle = "#c9993f";
-  c.lineWidth = 18;
-  c.beginPath();
-  c.moveTo(24, 20);
-  c.lineTo(W - 24, 20);
-  c.lineTo(W - 24, H * 0.85);
-  c.lineTo(W / 2, H * 0.945);
-  c.lineTo(24, H * 0.85);
-  c.closePath();
-  c.stroke();
-  // a lion's head in gold: flowing mane, broad face, proud muzzle
-  c.save();
-  c.translate(W / 2, H * 0.42);
-  c.fillStyle = "#d8ac4e";
-  for (let i = 0; i < 20; i++) {
-    const a = (i / 20) * Math.PI * 2;
-    c.beginPath();
-    c.moveTo(Math.cos(a) * 80, Math.sin(a) * 80);
-    c.quadraticCurveTo(Math.cos(a + 0.18) * 170, Math.sin(a + 0.18) * 170, Math.cos(a + 0.42) * 112, Math.sin(a + 0.42) * 112);
-    c.lineTo(Math.cos(a + 0.32) * 80, Math.sin(a + 0.32) * 80);
-    c.fill();
-  }
-  c.beginPath();
-  c.arc(0, 0, 112, 0, Math.PI * 2);
-  c.fill();
-  c.strokeStyle = "#8a5a1a";
-  c.lineWidth = 4;
-  for (let i = 0; i < 14; i++) {
-    const a = (i / 14) * Math.PI * 2;
-    c.beginPath();
-    c.moveTo(Math.cos(a) * 82, Math.sin(a) * 82);
-    c.quadraticCurveTo(Math.cos(a + 0.15) * 108, Math.sin(a + 0.15) * 108, Math.cos(a + 0.3) * 104, Math.sin(a + 0.3) * 104);
-    c.stroke();
-  }
-  for (const s of [-1, 1]) {
-    c.fillStyle = "#c99a3e";
-    c.beginPath();
-    c.arc(s * 58, -62, 20, 0, Math.PI * 2);
-    c.fill();
-  }
-  c.fillStyle = "#c08e33";
-  c.beginPath();
-  c.ellipse(0, 12, 64, 78, 0, 0, Math.PI * 2);
-  c.fill();
-  c.fillStyle = "#5a0b12";
-  for (const s of [-1, 1]) {
-    c.beginPath();
-    c.ellipse(s * 25, -12, 12, 5, s * 0.35, 0, Math.PI * 2);
-    c.fill();
-  }
-  c.fillStyle = "#e6c57a";
-  for (const s of [-1, 1]) {
-    c.beginPath();
-    c.arc(s * 15, 46, 18, 0, Math.PI * 2);
-    c.fill();
-  }
-  c.fillStyle = "#5a0b12";
-  c.beginPath();
-  c.moveTo(-13, 22);
-  c.lineTo(13, 22);
-  c.lineTo(0, 38);
-  c.fill();
-  c.strokeStyle = "#5a0b12";
-  c.lineWidth = 3;
-  c.beginPath();
-  c.moveTo(0, 38);
-  c.lineTo(0, 54);
-  c.moveTo(-18, 66);
-  c.quadraticCurveTo(0, 74, 18, 66);
-  c.stroke();
-  c.restore();
-  grain(c, fine, W, H, "overlay", 0.4);
-  return toTexture(canvas, { repeat: [1, 1] });
-}
-
 // Leaded diamond panes for the window glass (transparent between the lead).
 function leadedGlass() {
   const W = 256;
@@ -582,7 +492,6 @@ export function makeRoomTextures() {
     rug: rug(fine),
     leather: leather(fine, coarse),
     spines: bookSpines(fine),
-    banner: banner(fine),
     glass: leadedGlass(),
     straw: straw(),
     fine,

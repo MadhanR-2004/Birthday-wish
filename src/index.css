@@ -88,6 +88,80 @@ h2 {
   opacity: 0;
 }
 
+/* Under the sealed envelope: the one question that opens it */
+.seal-question {
+  width: min(340px, calc(100vw - 32px));
+  margin: 70px auto 0;
+  text-align: center;
+}
+
+.seal-question-input {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 50px;
+  padding: 0 18px;
+  border: 1px solid rgba(233, 207, 150, 0.55);
+  border-radius: 999px;
+  background: rgba(10, 8, 6, 0.72);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+  color: #e9cf96;
+  font: 700 1.2rem var(--font-label);
+  letter-spacing: 2px;
+  text-align: center;
+  animation: appear 0.6s ease-out both;
+}
+
+.seal-question-input::placeholder {
+  color: #cbbfa7;
+  font-weight: 400;
+  font-size: 0.95rem;
+  letter-spacing: 1.5px;
+}
+
+.seal-question-input:focus {
+  outline: 2px solid #e9cf96;
+  outline-offset: 2px;
+}
+
+.seal-question-input.is-wrong {
+  animation: seal-shake 0.45s ease-in-out;
+}
+
+.seal-question-input.is-right {
+  border-color: #e9cf96;
+  outline: none;
+  animation: seal-glow 1.2s ease-out forwards;
+}
+
+.seal-question-note {
+  min-height: 1.4em;
+  margin: 10px 0 0;
+  color: #cbbfa7;
+  font: italic 0.95rem var(--font-story);
+  text-shadow: 0 1px 6px rgba(0, 0, 0, 0.8);
+}
+
+@keyframes seal-shake {
+  0%, 100% { transform: translateX(0); }
+  20% { transform: translateX(-10px); }
+  40% { transform: translateX(8px); }
+  60% { transform: translateX(-6px); }
+  80% { transform: translateX(3px); }
+}
+
+@keyframes seal-glow {
+  40% { box-shadow: 0 0 34px rgba(255, 200, 120, 0.85); transform: scale(1.04); }
+  100% { box-shadow: 0 0 60px rgba(255, 200, 120, 0); transform: scale(1); opacity: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .seal-question-input,
+  .seal-question-input.is-wrong,
+  .seal-question-input.is-right {
+    animation: none;
+  }
+}
+
 /* Shown after the letter has flown away */
 .read-again {
   display: flex;

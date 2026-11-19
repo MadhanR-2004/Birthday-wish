@@ -9,7 +9,8 @@ import "./TowerRoom.css";
 // basin), the room is yours to explore: tap any glowing light, watch what it
 // does, and the view comes back to the whole room by itself.
 export default function TowerRoom({ config, onLeave, onOpenMemories, explore = false }) {
-  const { name, owlName } = config;
+  const { name, owlName, secret } = config;
+  const needsWord = !!secret?.date;
   const hostRef = useRef(null);
   const sceneRef = useRef(null);
   const [status, setStatus] = useState("loading"); // loading | ready | failed
@@ -20,6 +21,10 @@ export default function TowerRoom({ config, onLeave, onOpenMemories, explore = f
   const [holding, setHolding] = useState(false);
   const [hover, setHover] = useState(null); // { label, x, y } under the mouse
   const [tip, setTip] = useState(false);
+  const [visiting, setVisiting] = useState(null); // { title } while looking at one thing
+  // the letter is sealed with our important date (unless you've already opened it)
+  const [unlocked, setUnlocked] = useState(explore || !needsWord);
+  const requestReadRef = useRef(null);
   const [step, setStep] = useState(undefined); // the story's current step, or null once it's over
   const pointerRef = useRef({ x: 0, y: 0 });
   const leaveRef = useRef(onLeave);
@@ -39,10 +44,12 @@ export default function TowerRoom({ config, onLeave, onOpenMemories, explore = f
           name,
           owlName,
           withBasin: !!onOpenMemories,
+          photos: (config.memories ?? []).flatMap((m) => m.pictures ?? []),
           explore,
           reduceMotion: window.matchMedia("(prefers-reduced-motion: reduce)").matches,
           onProgress: setProgress,
-          onReadLetter: () => setReading(true),
+          onReadLetter: () => requestReadRef.current(),
+          onVisit: setVisiting,
           onNarrate: setLine,
           onLetterReady: setLetterReady,
           onWand: setHolding,
@@ -88,6 +95,8 @@ export default function TowerRoom({ config, onLeave, onOpenMemories, explore = f
     function onKey(e) {
       if (e.key !== "Escape") return;
       if (reading) closeLetter();
+      else if (step?.mode === "found") sceneRef.current?.closeFound();
+      else if (visiting) sceneRef.current?.leaveVisit();
       else if (step) return; // the story keeps the wand in your hand
       else if (holding) sceneRef.current?.setWand(false);
       else leaveRef.current();
@@ -99,6 +108,8 @@ export default function TowerRoom({ config, onLeave, onOpenMemories, explore = f
   function readLetter() {
     setReading(true);
   }
+  const requestRead = readLetter;
+  requestReadRef.current = requestRead;
   function closeLetter() {
     setReading(false);
     // after reading, the story points on to the memory basin
@@ -129,9 +140,9 @@ export default function TowerRoom({ config, onLeave, onOpenMemories, explore = f
       {/* top: back on the left; the letter and replay on the right */}
       <button
         className="tr-round tr-back"
-        onClick={reading ? closeLetter : onLeave}
-        aria-label={reading ? "Back to the room" : "Back to the start"}
-        title={reading ? "Back to the room" : "Back to the start"}
+        onClick={reading ? closeLetter : visiting ? () => sceneRef.current?.leaveVisit() : onLeave}
+        aria-label={reading || visiting ? "Back to the room" : "Back to the start"}
+        title={reading || visiting ? "Back to the room" : "Back to the start"}
       >
         ←
       </button>
@@ -139,7 +150,7 @@ export default function TowerRoom({ config, onLeave, onOpenMemories, explore = f
       {reading && (
         <div className="tr-reading">
           <main className="stage">
-            <BirthdayLetter config={config} withOwl={false} />
+            <BirthdayLetter config={config} withOwl={false} lock={unlocked ? null : secret} onUnlock={() => setUnlocked(true)} />
           </main>
         </div>
       )}
@@ -148,7 +159,7 @@ export default function TowerRoom({ config, onLeave, onOpenMemories, explore = f
         <>
           <div className="tr-top-right">
             {letterReady && storyOver && (
-              <button className="tr-pill is-gold" onClick={readLetter}>
+              <button className="tr-pill is-gold" onClick={requestRead}>
                 Read the letter
               </button>
             )}
@@ -175,7 +186,16 @@ export default function TowerRoom({ config, onLeave, onOpenMemories, explore = f
                     <span key={i} className={i < step.index ? "is-done" : i === step.index ? "is-now" : ""} />
                   ))}
                 </div>
-                <p className={`tr-story-text ${step.prompt ? "" : "is-waiting"}`}>{step.prompt ?? "\u00a0"}</p>
+                {step.mode === "found" && (
+                  <button className="tr-story-close" onClick={() => sceneRef.current?.closeFound()} aria-label="Close and choose the next one" title="Close">
+                    ×
+                  </button>
+                )}
+                {step.mode === "found" ? (
+                  <p className="tr-story-text">Cast it again as many times as you like. Tap × when you're ready for the next one.</p>
+                ) : (
+                  <p className={`tr-story-text ${step.prompt ? "" : "is-waiting"}`}>{step.prompt ?? "\u00a0"}</p>
+                )}
                 {step.choices?.length > 0 && (
                   <div className="tr-choices">
                     {step.choices.map((c) => (
@@ -187,7 +207,7 @@ export default function TowerRoom({ config, onLeave, onOpenMemories, explore = f
                 )}
                 <div className="tr-story-actions">
                   {step.action && (
-                    <button className="tr-pill is-gold" onClick={step.mode === "basin" ? onOpenMemories : readLetter}>
+                    <button className="tr-pill is-gold" onClick={step.mode === "basin" ? onOpenMemories : requestRead}>
                       {step.action}
                     </button>
                   )}
@@ -215,7 +235,18 @@ export default function TowerRoom({ config, onLeave, onOpenMemories, explore = f
                 </button>
               </div>
             )}
-            {!step && !holding && tip && <p className="tr-tip">Tap any glowing light to see what it does</p>}
+            {!step && visiting && (
+              <div className="tr-visit" role="group" aria-label={visiting.title}>
+                <span className="tr-visit-name">{visiting.title}</span>
+                <button className="tr-pill is-gold" onClick={() => sceneRef.current?.again()}>
+                  Do it again
+                </button>
+                <button className="tr-visit-close" onClick={() => sceneRef.current?.leaveVisit()} aria-label="Back to the whole room" title="Back to the whole room">
+                  ×
+                </button>
+              </div>
+            )}
+            {!step && !holding && !visiting && tip && <p className="tr-tip">Tap any glowing light to see what it does</p>}
           </div>
         </>
       )}

@@ -327,16 +327,21 @@ export function buildMirror(scene, models, mats, { name }, angle) {
   words.width = 512;
   words.height = 768;
   const w = words.getContext("2d");
-  w.fillStyle = "#000";
-  w.fillRect(0, 0, 512, 768);
-  w.fillStyle = "#ffe2a0";
-  w.textAlign = "center";
-  w.font = '64px "Homemade Apple", "IM Fell English", cursive';
-  w.fillText("Happy", 256, 300);
-  w.fillText("birthday,", 256, 390);
-  w.fillText(`${name}`, 256, 480);
-  w.font = '30px "IM Fell English", serif';
-  w.fillText("may every wish find its way home", 256, 580);
+  function drawWords(lines, small) {
+    w.fillStyle = "#000";
+    w.fillRect(0, 0, 512, 768);
+    w.fillStyle = "#ffe2a0";
+    w.textAlign = "center";
+    const size = lines.length > 4 ? 40 : 50;
+    w.font = `${size}px "Homemade Apple", "IM Fell English", cursive`;
+    const top = 384 - ((lines.length - 1) * size * 1.5) / 2 - (small ? 30 : 0);
+    lines.forEach((line, i) => w.fillText(line, 256, top + i * size * 1.5));
+    if (small) {
+      w.font = '30px "IM Fell English", serif';
+      w.fillText(small, 256, top + lines.length * size * 1.5 + 20);
+    }
+  }
+  drawWords(["Happy", "birthday,", `${name}`], "may every wish find its way home");
   const wordsTex = new THREE.CanvasTexture(words);
   const glassMat = new THREE.ShaderMaterial({
     uniforms: { uTime: { value: 0 }, uShow: { value: 0 }, uWords: { value: wordsTex } },
@@ -385,6 +390,7 @@ export function buildMirror(scene, models, mats, { name }, angle) {
       goal = 1;
       hide = 9;
     },
+    // show other words in the glass (from now on)
     update(dt, t) {
       hide = Math.max(0, hide - dt);
       if (hide <= 0) goal = 0;

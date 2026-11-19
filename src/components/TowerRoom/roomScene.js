@@ -9,6 +9,9 @@ import { makeRoomTextures } from "./roomTextures.js";
 import * as props from "./roomProps.js";
 import * as magic from "./roomMagic.js";
 import * as furniture from "./roomFurniture.js";
+import { createSpells } from "./roomSpells.js";
+import * as extras from "./roomExtras.js";
+import { buildGryffindorBanner } from "./roomBanners.js";
 import { loadRoomAssets, surfaceMaterial } from "./roomAssets.js";
 import { createGuidedCamera } from "./guidedCamera.js";
 
@@ -151,7 +154,6 @@ function makeMaterials(tex, surfaces) {
         }
       }),
     }),
-    banner: phys({ map: tex.banner, roughness: 0.85, sheen: 1, sheenColor: new THREE.Color(0xff8090), side: THREE.DoubleSide, alphaTest: 0.1 }),
     rug: std({ map: tex.rug, roughness: 0.97 }),
     straw: std({ map: tex.straw, roughness: 0.9 }),
   };
@@ -200,7 +202,7 @@ export async function createRoomScene(host, options = {}) {
   const shell = props.buildShell(scene, mats, tex);
   const sky = props.buildSky(scene, moonDir);
   props.buildRug(scene, mats);
-  props.buildBanner(scene, mats, -2.8);
+  buildGryffindorBanner(scene, mats);
   props.buildSconce(scene, mats, flickers, 0.72);
   props.buildSconce(scene, mats, flickers, -0.72);
   const bed = props.buildBed(scene, mats, tex, { model: models.GothicBed_01 });
@@ -236,6 +238,13 @@ export async function createRoomScene(host, options = {}) {
   const wand = magic.buildWand(bedside, mats, sparks);
   const spectacles = furniture.buildSpectaclesModel(bedside, models, sparks);
   const moonbeam = magic.buildMoonbeam(scene, moonDir);
+  // the mirror's mist writing and the quill's paper butterflies
+  const spells = createSpells(scene, camera, sparks, { name, reduceMotion });
+  // a golden snitch, moving photos of the two of you, and a music box
+  const snitch = extras.buildSnitch(scene, camera, sparks);
+  const photos = extras.buildPhotoWall(scene, mats, sparks, options.photos ?? []);
+  const musicBox = extras.buildMusicBox(scene, mats, sparks);
+  const added = [snitch, musicBox, ...(photos ? [photos] : [])];
   magic.buildContactShadows(scene, [
     [-2.85, 0.35, 2.9, 2.0],
     [-1.5, 0.35, 0.8, 1.2],
@@ -649,8 +658,8 @@ export async function createRoomScene(host, options = {}) {
       if (id === "take") takeLetter();
     },
   };
-  const interactive = [owlProp, letterProp, bed, trunk, bedside, desk, globe, cage, shelf, candles, painting, broom, fireplace, potions, frog, portrait, map, wand, spectacles, chess, mirror, windowProp];
-  const updaters = [bed, trunk, bedside, desk, globe, cage, shelf, candles, painting, broom, fireplace, potions, frog, portrait, map, wand, spectacles, chess, mirror];
+  const interactive = [owlProp, letterProp, bed, trunk, bedside, desk, globe, cage, shelf, candles, painting, broom, fireplace, potions, frog, portrait, map, wand, spectacles, chess, mirror, windowProp, ...added];
+  const updaters = [bed, trunk, bedside, desk, globe, cage, shelf, candles, painting, broom, fireplace, potions, frog, portrait, map, wand, spectacles, chess, mirror, ...added];
   const colliders = interactive.flatMap((p) => p.colliders ?? []);
   for (const p of interactive) p.root.traverse((o) => (o.userData.propKey = p.key));
   const byKey = Object.fromEntries(interactive.map((p) => [p.key, p]));
@@ -708,7 +717,7 @@ export async function createRoomScene(host, options = {}) {
   function placeHotspot(h) {
     const p = h.prop;
     if (p.key === "owl") return h.sprite.position.copy(owl.root.position).add(tmpV.set(0, 0.62, 0));
-    const spot = p.hotspot;
+    const spot = p.hotspot; // (a getter, for things that move)
     if (spot) return h.sprite.position.copy(spot);
     bbox.setFromObject(p.root);
     bbox.getCenter(h.sprite.position);
@@ -717,7 +726,7 @@ export async function createRoomScene(host, options = {}) {
   function updateHotspots(t) {
     const delivering = !["home", "hovering"].includes(story.phase);
     for (const h of hotspots) {
-      if (h.prop.key === "owl" || !h.placed) {
+      if (h.prop.key === "owl" || h.prop.moving || !h.placed) {
         placeHotspot(h);
         h.placed = true;
       }
@@ -738,18 +747,19 @@ export async function createRoomScene(host, options = {}) {
 
   // ---------- the story ----------
   // Take the letter, pick up the wand, then choose what to enchant, in any
-  // order. When the whole room is alive with magic, the seal melts and the
-  // letter is ready to read; after that, the memory basin is waiting.
+  // order. Stay at each one as long as you like, then close it and choose
+  // the next. Once the room is alive with magic, the letter is ready (its
+  // seal asks for our important date); after it, the memory basin is waiting.
 
   const STATIONS = [
     { key: "candles", choice: "Light the candles", view: () => candles.focus, prompt: "Point the wand at the floating candles and tap." },
     { key: "fireplace", choice: "Warm the fireplace", view: () => VIEWS.fireside, prompt: "Point the wand at the fireplace and tap." },
     { key: "mirror", choice: "Wake the old mirror", view: () => mirror.focus, prompt: "Point the wand at the old mirror and tap." },
-    { key: "map", choice: "Open the old map", view: () => map.focus, prompt: "Point the wand at the map on the desk and tap." },
+    { key: "desk", choice: "Wake the quill", view: () => desk.focus, prompt: "Point the wand at the quill on the writing desk and tap." },
   ];
   const stations = STATIONS;
-  // phase: letter | wand | choose | cast | wait | read | basin
-  const guide = { active: true, phase: "letter", target: null, done: [], wait: 0, then: null, shown: false };
+  // phase: letter | wand | choose | cast | wait | found | read | basin
+  const guide = { active: true, phase: "letter", target: null, done: [], last: null, wait: 0, then: null, shown: false };
   const withBasin = options.withBasin !== false;
   const total = stations.length + (withBasin ? 4 : 3); // the letter, the wand, each enchantment, reading, the basin
   const remaining = () => stations.filter((s) => !guide.done.includes(s.key));
@@ -766,6 +776,8 @@ export async function createRoomScene(host, options = {}) {
         return !!stationOf(key);
       case "cast":
         return key === guide.target;
+      case "found":
+        return key === guide.last;
       default:
         return false;
     }
@@ -773,20 +785,22 @@ export async function createRoomScene(host, options = {}) {
   function announce() {
     if (!guide.active) return options.onStep?.(null);
     const g = guide.phase;
-    const index = g === "letter" ? 0 : g === "wand" ? 1 : g === "read" ? total - (withBasin ? 2 : 1) : g === "basin" ? total - 1 : 2 + Math.min(guide.done.length, stations.length - 1);
+    const index = g === "letter" ? 0 : g === "wand" ? 1 : g === "read" ? total - (withBasin ? 2 : 1) : g === "basin" ? total - 1 : g === "found" ? 1 + guide.done.length : 2 + Math.min(guide.done.length, stations.length - 1);
     const base = { index, total, mode: g, prompt: null };
     if (g === "letter") {
       base.prompt = story.phase === "hovering" ? `${owlName} has brought you a letter. Tap her to take it.` : null;
     } else if (g === "wand") {
       base.prompt = "The letter is sealed with a spell. Pick up the wand from the bedside table.";
     } else if (g === "choose") {
-      base.prompt = guide.done.length ? "What will you enchant next?" : "The seal won't break until the room is alive with magic. What will you enchant first?";
+      base.prompt = guide.done.length ? (remaining().length === 1 ? "One more to go." : "What will you enchant next?") : "The letter won't open until the room is alive with magic. What will you enchant first?";
       base.choices = remaining().map((s) => ({ key: s.key, label: s.choice }));
     } else if (g === "cast") {
       base.prompt = stations.find((s) => s.key === guide.target)?.prompt ?? null;
+    } else if (g === "found") {
+      base.prompt = null;
     } else if (g === "read") {
-      base.prompt = "The whole room is glowing, and the seal has melted. Your letter is ready.";
-      base.action = "Read the letter";
+      base.prompt = "The whole room is glowing. Your letter is ready.";
+      base.action = "Open the letter";
     } else if (g === "basin") {
       base.prompt = "One last thing: your memories are waiting for you in the stone basin.";
       base.action = "Go to the memory basin";
@@ -800,6 +814,12 @@ export async function createRoomScene(host, options = {}) {
     if (phase === "choose") goTo("overview");
     if (phase === "cast") {
       const s = stations.find((x) => x.key === guide.target);
+      if (s) guided.goTo({ fov: 46, ...s.view() });
+      options.onView?.(null);
+    }
+    if (phase === "found") {
+      // stay looking at what you just enchanted
+      const s = stations.find((x) => x.key === guide.last);
       if (s) guided.goTo({ fov: 46, ...s.view() });
       options.onView?.(null);
     }
@@ -824,7 +844,8 @@ export async function createRoomScene(host, options = {}) {
     if ((guide.phase === "choose" || guide.phase === "cast") && stationOf(key)) {
       guide.done.push(key);
       guide.target = null;
-      waitThen(remaining().length ? "choose" : "read", 2.6);
+      guide.last = key;
+      waitThen("found", 1.6);
     }
   }
   function updateGuide(dt) {
@@ -839,7 +860,7 @@ export async function createRoomScene(host, options = {}) {
     }
   }
   function startGuide() {
-    Object.assign(guide, { active: true, phase: "letter", target: null, done: [], wait: 0, then: null, shown: false });
+    Object.assign(guide, { active: true, phase: "letter", target: null, done: [], last: null, wait: 0, then: null, shown: false });
     candles.setLit(false, true);
     fireplace.setLevel(0);
     announce();
@@ -882,10 +903,7 @@ export async function createRoomScene(host, options = {}) {
 
   function runAction(prop, id, object) {
     prop.act(id, object);
-    if (prop.say) {
-      onNarrate(prop.say);
-      prop.say = null;
-    }
+    prop.say = null;
   }
 
   function onPointerMove(e) {
@@ -907,9 +925,10 @@ export async function createRoomScene(host, options = {}) {
       else if (stationOf(hit.prop.key)) setWand(true); // put it down by mistake: pick it back up
       return;
     }
-    // exploring: one thing at a time, then back to the whole room
+    // exploring one thing: tap it again (as often as you like) to repeat
+    // its magic; the × in the page takes you back to the whole room
     if (visit.prop) {
-      if (visit.stage === "there") endVisit();
+      if (visit.stage === "there" && hit?.prop === visit.prop) visitMagic(hit.hotspot ? visit.object : hit.object);
       return;
     }
     if (!hit) return;
@@ -926,14 +945,14 @@ export async function createRoomScene(host, options = {}) {
 
   // ---------- exploring after the story ----------
   // Everything starts from the view of the whole room with its glowing
-  // lights. Tap one: the camera goes over, the magic happens, and after a
-  // moment (or another tap) it comes back to the whole room.
-  const visit = { prop: null, object: null, t: 0, stage: null };
-  const VISIT_HOLD = 4.5;
+  // lights. Tap one: the camera goes over and the magic happens. Stay as
+  // long as you like, doing it again and again, then close it to come back
+  // to the whole room.
+  const visit = { prop: null, object: null, stage: null };
   function startVisit(prop, object) {
     if (prop.key === "wand") return setWand(true);
     if (prop.key === "letter") return options.onReadLetter?.();
-    Object.assign(visit, { prop, object, t: 0, stage: "going" });
+    Object.assign(visit, { prop, object, stage: "going" });
     selectedKey = prop.key;
     onSelect(null);
     lookAtProp(prop);
@@ -942,19 +961,19 @@ export async function createRoomScene(host, options = {}) {
     if (!visit.prop) return;
     Object.assign(visit, { prop: null, object: null, stage: null });
     selectedKey = null;
+    options.onVisit?.(null);
     goTo("overview");
   }
-  function updateVisit(dt) {
-    if (!visit.prop) return;
-    if (visit.stage === "going" && !guided.busy) {
+  function visitMagic(object = visit.object) {
+    const [words, cast] = spellFor(visit.prop, object);
+    onNarrate(words);
+    cast();
+  }
+  function updateVisit() {
+    if (visit.prop && visit.stage === "going" && !guided.busy) {
       visit.stage = "there";
-      visit.t = 0;
-      const [words, cast] = spellFor(visit.prop, visit.object);
-      onNarrate(words);
-      cast();
-    } else if (visit.stage === "there") {
-      visit.t += dt;
-      if (visit.t > VISIT_HOLD) endVisit();
+      visitMagic();
+      options.onVisit?.({ title: visit.prop.title ?? "" });
     }
   }
   renderer.domElement.addEventListener("pointermove", onPointerMove);
@@ -1014,7 +1033,6 @@ export async function createRoomScene(host, options = {}) {
     options.onWand?.(on);
     renderer.domElement.style.cursor = on ? "crosshair" : "";
     if (on) {
-      onNarrate("The wand is warm in your hand, and it hums.");
       if (guide.active) guideDone("wand");
       else goTo("overview");
     }
@@ -1054,47 +1072,53 @@ export async function createRoomScene(host, options = {}) {
 
   // Which spell a click casts, depending on what it hits.
   function spellFor(prop, object) {
-    if (prop?.key === "owl") return [`"Hello, ${owlName}!" She hoots and fluffs up her feathers.`, () => (owl.hoot(), owl.ruffle())];
+    if (prop?.key === "owl") return [`"Hello, ${owlName}!"`, () => (owl.hoot(), owl.ruffle())];
     if (prop?.key === "letter") return ["Accio letter!", () => takeLetter()];
     const lifted = levitating(object);
     if (lifted) return ["Wingardium Leviosa!", () => levitate(lifted)];
     switch (prop?.key) {
       case "fireplace":
-        return ["Incendio! The fire roars up the chimney.", () => fireplace.act("stoke")];
+        return ["Incendio!", () => fireplace.act("stoke")];
       case "candles":
-        return ["Lumos Maxima! The candles blaze.", () => candles.act()];
+        return ["Lumos Maxima!", () => candles.act()];
       case "window":
-        return [windowOpen ? "Colloportus! The window swings shut." : "Alohomora! The window swings open.", () => windowProp.act()];
+        return [windowOpen ? "Colloportus!" : "Alohomora!", () => windowProp.act()];
       case "cage":
-        return ["Alohomora! The cage door swings.", () => cage.act()];
+        return ["Alohomora!", () => cage.act()];
       case "trunk":
-        return ["Alohomora! The lid of the trunk creaks open.", () => trunk.act("lid")];
+        return ["Alohomora!", () => trunk.act("lid")];
       case "mirror":
-        return ["Revelio! Words rise up through the glass.", () => mirror.act()];
+        return ["Revelio!", () => spells.writing(mirror.focus.target, () => mirror.act())];
       case "map":
         return ["I solemnly swear that I am up to no good.", () => map.act()];
       case "broom":
-        return ["Up! The broom leaps off the floor.", () => broom.act()];
+        return ["Up!", () => broom.act()];
       case "spectacles":
         return ["Oculus Reparo!", () => spectacles.act()];
       case "potions":
-        return ["Incendio! The potions start to bubble and glow.", () => potions.act()];
+        return ["Incendio!", () => potions.act()];
       case "globe":
-        return ["Spin! The star globe whirls.", () => globe.act()];
+        return ["Spin!", () => globe.act()];
       case "desk":
-        return ["Scribbulus! The quill starts to write.", () => desk.act()];
+        return ["Scribbulus!", () => (desk.act(), spells.butterflies(desk.focus.target, reduceMotion ? 0 : 1.2))];
       case "bed":
-        return ["The curtains sweep across by themselves.", () => bed.act()];
+        return ["Accio curtains!", () => bed.act()];
       case "bedside":
         return ["Nox… Lumos!", () => bedside.act()];
       case "chess":
-        return ["Your move! The chessmen spring into action.", () => runAction(chess, "move")];
+        return ["Your move!", () => runAction(chess, "move")];
       case "frog":
-        return ["Out it hops!", () => frog.act()];
+        return ["Ribbit!", () => frog.act()];
       case "painting":
-        return ["Ventus! A breeze ripples through the painting.", () => painting.act()];
+        return ["Ventus!", () => painting.act()];
       case "portrait-of-an-old-wizard":
-        return ["The old wizard chuckles and waves at you.", () => portrait.act()];
+        return ["Good evening!", () => portrait.act()];
+      case "snitch":
+        return ["I open at the close.", () => snitch.act()];
+      case "photos":
+        return ["", () => photos.act(null, object)];
+      case "musicbox":
+        return ["", () => musicBox.act()];
       case "books":
         return ["Wingardium Leviosa!", () => levitate(object)];
       default:
@@ -1182,9 +1206,10 @@ export async function createRoomScene(host, options = {}) {
 
     updateStory(dt);
     updateGuide(dt);
-    updateVisit(dt);
+    updateVisit();
     for (const p of updaters) p.update?.(dt, time, camera);
     sparks.update(dt);
+    spells.update(dt, time);
     moonbeam.material.uniforms.uTime.value = time;
     mats.flame.uniforms.uTime.value = time;
     sky.material.uniforms.uTime.value = time;
@@ -1199,7 +1224,7 @@ export async function createRoomScene(host, options = {}) {
     if (pointerMoved && !guided.busy) {
       pointerMoved = false;
       const found = pointer.clientX !== undefined ? pick(pointer.clientX, pointer.clientY) : null;
-      const hit = found && !visit.prop && (!guide.active || isTarget(found.prop.key)) ? found : null;
+      const hit = found && (visit.prop ? visit.stage === "there" && found.prop === visit.prop : !guide.active || isTarget(found.prop.key)) ? found : null;
       const object = hit ? (hit.object.userData.levitate && holding ? hit.object : hit.prop.key === "books" && hit.object.userData.book ? hit.object : hit.prop.root) : null;
       if (object !== hovered) {
         hovered = object;
@@ -1252,6 +1277,7 @@ export async function createRoomScene(host, options = {}) {
     },
     replay() {
       Object.assign(visit, { prop: null, object: null, stage: null });
+      options.onVisit?.(null);
       setWand(false);
       resetStory();
       goTo("overview");
@@ -1263,6 +1289,9 @@ export async function createRoomScene(host, options = {}) {
     setWand,
     // the story's over (after the letter's been read): explore freely
     finishStory: () => endGuide(),
+    // while looking at one thing: do its magic again, or go back to the room
+    again: () => visit.stage === "there" && visitMagic(),
+    leaveVisit: () => endVisit(),
     // pick what to enchant next (from the story's choices)
     choose(key) {
       if (!guide.active || !["choose", "cast"].includes(guide.phase) || !stationOf(key)) return;
@@ -1273,6 +1302,10 @@ export async function createRoomScene(host, options = {}) {
     // back to the list of choices, without casting
     chooseAgain() {
       if (guide.active && guide.phase === "cast") guideTo("choose");
+    },
+    // done here: on to the next choice, or the letter
+    closeFound() {
+      if (guide.active && guide.phase === "found") guideTo(remaining().length ? "choose" : "read");
     },
     // the letter's been read: the last step points to the memory basin
     letterRead() {
@@ -1285,6 +1318,7 @@ export async function createRoomScene(host, options = {}) {
       renderer.domElement.removeEventListener("pointerup", onPointerUp);
       guided.dispose();
       owl.dispose();
+      musicBox.dispose();
       const textures = new Set();
       scene.traverse((o) => {
         o.geometry?.dispose();

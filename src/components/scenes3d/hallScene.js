@@ -1,6 +1,7 @@
 import * as THREE from "three";
 import { createStage, loadSurface, retile, flameMaterial, canvasTexture, random, NOISE_GLSL, v3 } from "./common.js";
 import { createFlyingOwl } from "./flyingOwl.js";
+import { houseBannerCanvas } from "../houseBanners.js";
 
 // The great hall, in 3D: a long stone hall with tall arched windows, four
 // long tables laid with gold plates and goblets, hundreds of floating candles
@@ -204,42 +205,19 @@ export async function createHallScene(host, { reduceMotion = false } = {}) {
   throne.position.set(0, 2.0, -LENGTH / 2 + 3.0);
   scene.add(throne);
 
-  // ---------- banners in four house colours ----------
+  // ---------- the four house banners, one over each house table ----------
 
-  const houses = [
-    ["#7a0f18", "#d4a640"],
-    ["#0f4a2a", "#b8bcc4"],
-    ["#14285e", "#b98a52"],
-    ["#c79a1c", "#1a1a1a"],
-  ];
-  const bannerGeo = new THREE.PlaneGeometry(3, 9, 20, 30);
+  const bannerGeo = new THREE.PlaneGeometry(3, 8.25, 20, 30);
   {
     const p = bannerGeo.attributes.position;
     for (let i = 0; i < p.count; i++) p.setZ(i, Math.sin(p.getX(i) * 3) * 0.06 * (0.5 - p.getY(i) / 9));
     bannerGeo.computeVertexNormals();
   }
-  houses.forEach(([field, trim], i) => {
-    const tex = canvasTexture(256, 768, (c, w, h) => {
-      c.fillStyle = field;
-      c.beginPath();
-      c.moveTo(0, 0);
-      c.lineTo(w, 0);
-      c.lineTo(w, h * 0.86);
-      c.lineTo(w / 2, h);
-      c.lineTo(0, h * 0.86);
-      c.fill();
-      c.strokeStyle = trim;
-      c.lineWidth = 12;
-      c.strokeRect(16, 16, w - 32, h * 0.8);
-      c.fillStyle = trim;
-      c.beginPath();
-      for (let s = 0; s < 10; s++) {
-        const r = s % 2 ? 32 : 80;
-        const a = -Math.PI / 2 + (s * Math.PI) / 5;
-        c.lineTo(w / 2 + Math.cos(a) * r, h * 0.4 + Math.sin(a) * r);
-      }
-      c.fill();
-    });
+  // Gryffindor, Slytherin, Ravenclaw, Hufflepuff (see houseBanners.js)
+  [3, 0, 1, 2].forEach((house, i) => {
+    const tex = new THREE.CanvasTexture(houseBannerCanvas(house, () => (tex.needsUpdate = true)));
+    tex.colorSpace = THREE.SRGBColorSpace;
+    tex.anisotropy = 4;
     const mat = new THREE.MeshStandardMaterial({ map: tex, roughness: 0.85, side: THREE.DoubleSide, alphaTest: 0.1, transparent: true });
     const banner = new THREE.Mesh(bannerGeo, mat);
     banner.position.set(tableXs[i], 9.5, -LENGTH / 2 + 10);

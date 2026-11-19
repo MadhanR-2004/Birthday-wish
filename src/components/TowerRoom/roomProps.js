@@ -447,7 +447,7 @@ export function buildDesk(scene, mats, tex, { name }) {
   meridian.rotation.z = Math.PI / 2 + 0.4;
 
   // Writing: draw the letters one at a time and move the nib along with them.
-  const lines = [`Dear ${name},`, "Happy birthday!", "May this year be", "full of magic."];
+  let lines = [`Dear ${name},`, "Happy birthday!", "May this year be", "full of magic."];
   const ctx = sheet.canvas.getContext("2d");
   const fontFamily = '"Homemade Apple", "IM Fell English", cursive';
   let writing = null;
@@ -487,6 +487,7 @@ export function buildDesk(scene, mats, tex, { name }) {
       writing = { t: 0, line: 0, chars: 0 };
       redraw(0, 0);
     },
+    // give the quill something else to write (from now on), and start
     update(dt, t) {
       if (!writing) {
         quill.position.lerp(rest.pos, 1 - Math.exp(-dt * 4));
@@ -888,24 +889,6 @@ export function buildSconce(scene, mats, lights, angle) {
   light.position.set(0, 0.25, 0.22);
   root.add(light);
   lights.push({ light, base: 1.8, seed: angle * 3.3 });
-}
-
-// ---------- a crimson banner with a gold star ----------
-
-export function buildBanner(scene, mats, angle) {
-  const geo = new THREE.PlaneGeometry(0.7, 1.4, 30, 30);
-  const pos = geo.attributes.position;
-  for (let i = 0; i < pos.count; i++) pos.setZ(i, Math.sin(pos.getX(i) * 18) * 0.012 * (0.4 - pos.getY(i) * 0.3));
-  geo.computeVertexNormals();
-  const m = new THREE.Mesh(geo, mats.banner);
-  m.position.copy(onWall(angle, 0.06, 1.85));
-  m.rotation.y = angle + Math.PI;
-  m.castShadow = m.receiveShadow = true;
-  scene.add(m);
-  const rod = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.012, 0.86, 10), mats.brass);
-  rod.position.copy(onWall(angle, 0.08, 2.56));
-  rod.rotation.set(0, angle + Math.PI, Math.PI / 2);
-  scene.add(rod);
 }
 
 // ---------- a painting whose clouds drift and water ripples ----------

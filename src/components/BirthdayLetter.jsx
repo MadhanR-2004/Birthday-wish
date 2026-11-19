@@ -3,6 +3,7 @@ import AgedEnvelope from "./AgedEnvelope/AgedEnvelope.jsx";
 import LetterSheet, { LetterGreeting } from "./LetterSheet/LetterSheet.jsx";
 import BurntEdgesFilter from "./LetterSheet/BurntEdgesFilter.jsx";
 import OwlCarrier from "./OwlCarrier/OwlCarrier.jsx";
+import SealQuestion from "./AgedEnvelope/SealQuestion.jsx";
 
 // How long the seal-breaking, flap-opening and letter-sliding takes (ms).
 const OPEN_TIME = 2400;
@@ -21,9 +22,13 @@ const HINTS = {
 // "front" <-> "back" (tap the envelope to flip it either way)
 // ... -> "open" -> press the letter's corner -> "flown" -> Read it again -> "front"
 // "back" -> tap the seal -> "opening" -> "open"
+// With `lock` ({ date, hint }), the seal asks for our important date first,
+// and onUnlock is called once it's right.
 // config already has {name} filled in (see personalise.js).
-export default function BirthdayLetter({ config, withOwl = true, onOpenMemories }) {
+export default function BirthdayLetter({ config, withOwl = true, onOpenMemories, lock = null, onUnlock }) {
   const [stage, setStage] = useState("front");
+  const [nudge, setNudge] = useState(0);
+  const locked = !!lock?.date;
   // "holding" -> tap -> "letting-go" -> "gone"; back to "holding" on Read it again
   const [owl, setOwl] = useState(withOwl ? "holding" : "gone");
   const timers = useRef([]);
@@ -43,9 +48,18 @@ export default function BirthdayLetter({ config, withOwl = true, onOpenMemories 
 
   function handleBreakSeal() {
     if (stage !== "back") return;
+    if (locked) return setNudge((n) => n + 1); // answer the question first
+    breakSeal();
+  }
+
+  function breakSeal(delay = 0) {
     const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    setStage("opening");
-    timers.current.push(setTimeout(() => setStage("open"), reduceMotion ? 0 : OPEN_TIME));
+    timers.current.push(
+      setTimeout(() => {
+        setStage("opening");
+        timers.current.push(setTimeout(() => setStage("open"), reduceMotion ? 0 : OPEN_TIME));
+      }, reduceMotion ? 0 : delay),
+    );
   }
 
   if (stage === "open") {
@@ -90,7 +104,21 @@ export default function BirthdayLetter({ config, withOwl = true, onOpenMemories 
       <OwlCarrier
         holding={owl === "holding"}
         onUnavailable={() => setOwl("gone")}
-        after={<p className={`envelope-hint ${hint ? "" : "is-hidden"}`}>{hint || "\u00a0"}</p>}
+        after={
+          locked && stage === "back" ? (
+            <SealQuestion
+              date={lock.date}
+              hint={lock.hint}
+              nudge={nudge}
+              onRight={() => {
+                breakSeal(700);
+                timers.current.push(setTimeout(() => onUnlock?.(), 700));
+              }}
+            />
+          ) : (
+            <p className={`envelope-hint ${hint ? "" : "is-hidden"}`}>{hint || "\u00a0"}</p>
+          )
+        }
       >
         <AgedEnvelope
           address={config.address}

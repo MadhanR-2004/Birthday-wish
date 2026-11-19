@@ -20,6 +20,15 @@ export const BIRTHDAY = {
     color: "red",
   },
 
+  // In the tower room, the letter's wax seal asks for our important date
+  // before it breaks. Write it as day / month / year, e.g. "05/09/2023".
+  // Leave date empty ("") to open the letter without asking.
+  secret: {
+    date: "14/02/2024",
+    // shown after two wrong tries
+    hint: "Think back to the day everything changed for us.",
+  },
+
   // Handwritten address on the front of the envelope (first line is the biggest).
   address: ["To {name}", "The Brightest Star,", "Above the Highest Tower,", "The Castle on the Hill"],
 

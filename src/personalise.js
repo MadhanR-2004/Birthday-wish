@@ -11,6 +11,10 @@ export function fillInName(config) {
       paragraphs: config.letter.paragraphs.map(fill),
       signature: fill(config.letter.signature),
     },
+    secret: {
+      date: (config.secret?.date ?? "").trim(),
+      hint: fill(config.secret?.hint ?? ""),
+    },
     memories: (config.memories ?? []).map((memory) => ({
       ...memory,
       title: fill(memory.title),
