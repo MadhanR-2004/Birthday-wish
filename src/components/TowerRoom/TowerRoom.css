@@ -230,6 +230,92 @@
   font-weight: 600;
 }
 
+/* ---------- holding the wand: one spell at a time, ‹ › to change ---------- */
+
+.tr-spellbar {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  max-width: 100%;
+  padding: 5px 6px;
+  border: 1px solid rgba(233, 207, 150, 0.45);
+  border-radius: 999px;
+  background: var(--tr-panel);
+  animation: tr-rise 0.35s ease-out both;
+}
+
+.tr-spell-step,
+.tr-spell-lumos {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 36px;
+  height: 36px;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--tr-gold);
+  font-size: 1.5rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.tr-spell-step:hover,
+.tr-spell-lumos:hover {
+  background: rgba(233, 207, 150, 0.14);
+}
+
+.tr-spell-step:focus-visible,
+.tr-spell-lumos:focus-visible {
+  outline: 2px solid var(--tr-gold);
+}
+
+.tr-spell-now {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 190px;
+  padding: 0 4px;
+  text-align: center;
+}
+
+.tr-spell-name {
+  color: var(--tr-gold);
+  font: 700 1rem var(--font-label);
+  letter-spacing: 1px;
+  white-space: nowrap;
+  animation: tr-rise 0.25s ease-out both;
+}
+
+.tr-spell-hint {
+  color: var(--tr-muted);
+  font-size: 0.78rem;
+  font-style: italic;
+}
+
+.tr-spell-lumos {
+  margin-left: 2px;
+  border: 1px solid rgba(233, 207, 150, 0.35);
+  font-size: 1.05rem;
+}
+
+.tr-spell-lumos.is-on {
+  background: rgba(255, 244, 210, 0.28);
+  color: #fff6dc;
+  box-shadow: 0 0 14px rgba(255, 230, 160, 0.6);
+}
+
+@media (max-width: 420px) {
+  .tr-spell-now {
+    min-width: 0;
+    flex: 1;
+  }
+  .tr-spell-name {
+    font-size: 0.9rem;
+    white-space: normal;
+  }
+}
+
 /* ---------- looking at one thing: do it again, or close ---------- */
 
 .tr-visit {
@@ -406,6 +492,47 @@
   outline-offset: 2px;
 }
 
+/* ---------- walking about: an on-screen stick for touch screens ---------- */
+
+.tr-stick {
+  position: absolute;
+  left: 22px;
+  bottom: 96px;
+  z-index: 2;
+  display: grid;
+  place-items: center;
+  width: 112px;
+  height: 112px;
+  border: 1px solid rgba(233, 207, 150, 0.45);
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(20, 14, 8, 0.35), rgba(20, 14, 8, 0.6));
+  touch-action: none;
+  animation: tr-fade-in 0.4s ease-out both;
+}
+
+.tr-stick-knob {
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 40% 35%, #f6e2ae, var(--tr-gold) 60%, #a8823a);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.45);
+  pointer-events: none;
+}
+
+/* with a mouse and keyboard, the keys do the walking */
+@media (hover: hover) and (pointer: fine) {
+  .tr-stick {
+    display: none;
+  }
+}
+
+/* on touch screens there are no keys to mention */
+@media (hover: none), (pointer: coarse) {
+  .tr-walk-keys {
+    display: none;
+  }
+}
+
 /* ---------- reading the letter, over the room ---------- */
 
 .tr-reading {
@@ -457,7 +584,10 @@
   .tr-tip,
   .tr-visit,
   .tr-loading-title,
-  .tr-choice {
+  .tr-choice,
+  .tr-spellbar,
+  .tr-spell-name,
+  .tr-stick {
     animation: none;
   }
 }

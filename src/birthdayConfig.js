@@ -29,6 +29,20 @@ export const BIRTHDAY = {
     hint: "Think back to the day everything changed for us.",
   },
 
+  // In the tower room, a mandrake sings when you pull it up. Give it your
+  // own recording to sing: put the file in the "public/songs" folder and
+  // write its name here, e.g. "songs/our-song.mp3". Leave it empty ("")
+  // and it sings Happy Birthday instead.
+  song: "",
+
+  // The gramophone in the tower room plays your favourite songs: each tap
+  // (or spell) puts on the next one, and after the last it stops. Put the
+  // files in the "public/songs" folder and list them here. With none, it
+  // plays Happy Birthday.
+  favourites: [
+    // { title: "Our song", file: "songs/our-song.mp3" },
+  ],
+
   // Handwritten address on the front of the envelope (first line is the biggest).
   address: ["To {name}", "The Brightest Star,", "Above the Highest Tower,", "The Castle on the Hill"],
 

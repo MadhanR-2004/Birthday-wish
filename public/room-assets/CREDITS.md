@@ -12,3 +12,5 @@ domain): free to use for anything, no credit required.
 - Surfaces: castle_wall_varriation, dark_wooden_planks, velour_velvet,
   brown_leather, dark_wood
 - Lighting: fireplace (HDRI)
+- More models: potted_plant_02 (the mandrake's pot and leaves) and the
+  scanned gold of pocket_watch (the golden snitch)

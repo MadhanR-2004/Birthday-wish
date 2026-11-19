@@ -377,37 +377,82 @@ function leather(fine, coarse) {
   return toTexture(color);
 }
 
-// Book spines: cloth or leather colours with gilt bands and a title block.
+// Book spines: leather and cloth in old colours, with gold tooling, little
+// ornaments and a title running up the spine.
+const SPINE_TITLES = [
+  "Hogwarts: A History", "Advanced Potion-Making", "Fantastic Beasts", "The Standard Book of Spells", "Quidditch Through the Ages",
+  "The Tales of Beedle the Bard", "A History of Magic", "One Thousand Magical Herbs", "Magical Drafts and Potions", "The Dark Forces",
+];
 function bookSpines(fine) {
   const colors = [
     [352, 55, 26], [215, 45, 22], [140, 35, 20], [28, 45, 24], [45, 55, 32],
     [0, 0, 12], [265, 30, 22], [190, 35, 22], [20, 60, 18], [35, 30, 40],
   ];
   return colors.map((col, i) => {
-    const W = 64;
-    const H = 256;
+    const W = 128;
+    const H = 512;
     const rand = random(40 + i);
     const canvas = makeCanvas(W, H);
     const c = canvas.getContext("2d");
     c.fillStyle = hsl(...col);
     c.fillRect(0, 0, W, H);
+    // worn leather: darker at the edges, lighter where hands have held it
     const shade = c.createLinearGradient(0, 0, W, 0);
-    shade.addColorStop(0, "rgba(0,0,0,0.45)");
-    shade.addColorStop(0.35, "rgba(255,255,255,0.08)");
-    shade.addColorStop(1, "rgba(0,0,0,0.45)");
+    shade.addColorStop(0, "rgba(0,0,0,0.55)");
+    shade.addColorStop(0.3, "rgba(255,255,255,0.06)");
+    shade.addColorStop(0.55, "rgba(255,255,255,0.1)");
+    shade.addColorStop(1, "rgba(0,0,0,0.55)");
     c.fillStyle = shade;
     c.fillRect(0, 0, W, H);
-    c.fillStyle = "rgba(212, 170, 80, 0.85)";
-    const bands = 2 + Math.floor(rand() * 3);
-    for (let k = 0; k < bands; k++) {
-      c.fillRect(0, 14 + k * 9, W, 3);
-      c.fillRect(0, H - 17 - k * 9, W, 3);
+    for (let k = 0; k < 70; k++) {
+      c.fillStyle = `rgba(${rand() < 0.5 ? "0,0,0" : "255,255,255"},${0.03 + rand() * 0.05})`;
+      c.fillRect(rand() * W, rand() * H, 1 + rand() * 6, 1 + rand() * 3);
     }
-    c.fillRect(W * 0.2, H * 0.36, W * 0.6, H * 0.02);
-    c.fillRect(W * 0.25, H * 0.42, W * 0.5, H * 0.012);
-    c.fillRect(W * 0.3, H * 0.46, W * 0.4, H * 0.012);
+    const gold = "rgba(222, 182, 92, 0.95)";
+    c.fillStyle = gold;
+    c.strokeStyle = gold;
+    // raised bands at head and tail, each framed by fine gilt rules
+    for (const y of [0.1, 0.15, 0.85, 0.9]) {
+      c.fillStyle = "rgba(0,0,0,0.35)";
+      c.fillRect(0, H * y - 5, W, 10);
+      c.fillStyle = gold;
+      c.fillRect(0, H * y - 7, W, 2);
+      c.fillRect(0, H * y + 5, W, 2);
+    }
+    // a small ornament between the bands
+    const flower = (y) => {
+      for (let p = 0; p < 4; p++) {
+        c.save();
+        c.translate(W / 2, y);
+        c.rotate((p * Math.PI) / 2);
+        c.beginPath();
+        c.ellipse(0, -6, 3, 6, 0, 0, Math.PI * 2);
+        c.fill();
+        c.restore();
+      }
+    };
+    flower(H * 0.05);
+    flower(H * 0.955);
+    // the title, running up the spine, in a gilt-ruled panel
+    c.lineWidth = 1.5;
+    c.strokeRect(W * 0.16, H * 0.2, W * 0.68, H * 0.6);
+    c.save();
+    c.translate(W / 2, H / 2);
+    c.rotate(-Math.PI / 2);
+    c.fillStyle = gold;
+    c.textAlign = "center";
+    c.textBaseline = "middle";
+    const title = SPINE_TITLES[i % SPINE_TITLES.length];
+    let size = 40;
+    c.font = `700 ${size}px Cinzel, Georgia, serif`;
+    while (c.measureText(title).width > H * 0.56 && size > 14) {
+      size -= 1;
+      c.font = `700 ${size}px Cinzel, Georgia, serif`;
+    }
+    c.fillText(title, 0, 2);
+    c.restore();
     grain(c, fine, W, H, "overlay", 0.5);
-    const tex = toTexture(canvas, { anisotropy: 4 });
+    const tex = toTexture(canvas, { anisotropy: 8 });
     tex.wrapS = tex.wrapT = THREE.ClampToEdgeWrapping;
     return tex;
   });

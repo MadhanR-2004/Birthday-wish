@@ -22,6 +22,15 @@ export default function TowerRoom({ config, onLeave, onOpenMemories, explore = f
   const [hover, setHover] = useState(null); // { label, x, y } under the mouse
   const [tip, setTip] = useState(false);
   const [visiting, setVisiting] = useState(null); // { title } while looking at one thing
+  const [walking, setWalking] = useState(false); // walking about the room
+  const [spell, setSpell] = useState("own"); // which spell the wand casts
+  const spellIndex = Math.max(0, SPELLS.findIndex(([key]) => key === spell));
+  function pickSpell(step) {
+    const [key] = SPELLS[(spellIndex + step + SPELLS.length) % SPELLS.length];
+    setSpell(key);
+    sceneRef.current?.setSpell(key);
+  }
+  const [lumos, setLumos] = useState(false); // the wand's tip lit up
   // the letter is sealed with our important date (unless you've already opened it)
   const [unlocked, setUnlocked] = useState(explore || !needsWord);
   const requestReadRef = useRef(null);
@@ -44,12 +53,15 @@ export default function TowerRoom({ config, onLeave, onOpenMemories, explore = f
           name,
           owlName,
           withBasin: !!onOpenMemories,
-          photos: (config.memories ?? []).flatMap((m) => m.pictures ?? []),
+          song: config.song ? `${import.meta.env.BASE_URL}${config.song.replace(/^\//, "")}` : "",
+          favourites: (config.favourites ?? []).filter((f) => f?.file).map((f) => ({ title: f.title ?? "", url: `${import.meta.env.BASE_URL}${f.file.replace(/^\//, "")}` })),
           explore,
           reduceMotion: window.matchMedia("(prefers-reduced-motion: reduce)").matches,
           onProgress: setProgress,
           onReadLetter: () => requestReadRef.current(),
           onVisit: setVisiting,
+          onWalk: setWalking,
+          onLumos: setLumos,
           onNarrate: setLine,
           onLetterReady: setLetterReady,
           onWand: setHolding,
@@ -93,8 +105,13 @@ export default function TowerRoom({ config, onLeave, onOpenMemories, explore = f
 
   useEffect(() => {
     function onKey(e) {
+      if (holding && !step && !/input|textarea/i.test(e.target?.tagName ?? "")) {
+        if (e.key === "q" || e.key === "Q") return pickSpell(-1);
+        if (e.key === "e" || e.key === "E") return pickSpell(1);
+      }
       if (e.key !== "Escape") return;
       if (reading) closeLetter();
+      else if (walking) sceneRef.current?.walk(false);
       else if (step?.mode === "found") sceneRef.current?.closeFound();
       else if (visiting) sceneRef.current?.leaveVisit();
       else if (step) return; // the story keeps the wand in your hand
@@ -140,9 +157,9 @@ export default function TowerRoom({ config, onLeave, onOpenMemories, explore = f
       {/* top: back on the left; the letter and replay on the right */}
       <button
         className="tr-round tr-back"
-        onClick={reading ? closeLetter : visiting ? () => sceneRef.current?.leaveVisit() : onLeave}
-        aria-label={reading || visiting ? "Back to the room" : "Back to the start"}
-        title={reading || visiting ? "Back to the room" : "Back to the start"}
+        onClick={reading ? closeLetter : walking ? () => sceneRef.current?.walk(false) : visiting ? () => sceneRef.current?.leaveVisit() : onLeave}
+        aria-label={reading || visiting || walking ? "Back to the room" : "Back to the start"}
+        title={reading || visiting || walking ? "Back to the room" : "Back to the start"}
       >
         ←
       </button>
@@ -158,6 +175,11 @@ export default function TowerRoom({ config, onLeave, onOpenMemories, explore = f
       {status === "ready" && !reading && (
         <>
           <div className="tr-top-right">
+            {storyOver && !walking && !visiting && (
+              <button className="tr-pill" onClick={() => sceneRef.current?.walk(true)}>
+                Walk around
+              </button>
+            )}
             {letterReady && storyOver && (
               <button className="tr-pill is-gold" onClick={requestRead}>
                 Read the letter
@@ -226,12 +248,42 @@ export default function TowerRoom({ config, onLeave, onOpenMemories, explore = f
             )}
 
             {!step && holding && (
-              <div className="tr-wandbar" role="status">
-                <span>
-                  <strong>Wand ready.</strong> Tap anything to cast a spell.
+              <div className="tr-spellbar" role="group" aria-label="Your wand">
+                <button className="tr-spell-step" onClick={() => pickSpell(-1)} aria-label="Previous spell" title="Previous spell (Q)">
+                  ‹
+                </button>
+                <div className="tr-spell-now" aria-live="polite">
+                  <span key={spell} className="tr-spell-name">
+                    {SPELLS[spellIndex][1]}
+                  </span>
+                  <span className="tr-spell-hint">
+                    tap anything to cast{walking && <span className="tr-walk-keys"> · W A S D to walk</span>}
+                  </span>
+                </div>
+                <button className="tr-spell-step" onClick={() => pickSpell(1)} aria-label="Next spell" title="Next spell (E)">
+                  ›
+                </button>
+                <button className={`tr-spell-lumos ${lumos ? "is-on" : ""}`} aria-pressed={lumos} onClick={() => sceneRef.current?.lumos(!lumos)} aria-label="Lumos: light the wand" title="Lumos">
+                  ✦
+                </button>
+                {walking ? (
+                  <button className="tr-visit-close" onClick={() => sceneRef.current?.walk(false)} aria-label="Stop walking" title="Stop walking">
+                    ×
+                  </button>
+                ) : (
+                  <button className="tr-visit-close" onClick={() => sceneRef.current?.setWand(false)} aria-label="Put the wand down" title="Put the wand down">
+                    ×
+                  </button>
+                )}
+              </div>
+            )}
+            {!step && walking && !holding && (
+              <div className="tr-visit" role="group" aria-label="Walking around">
+                <span className="tr-visit-name">
+                  <span className="tr-walk-keys">Drag to look · W A S D or arrows to walk · </span>tap anything for its magic
                 </span>
-                <button className="tr-pill" onClick={() => sceneRef.current?.setWand(false)}>
-                  Put it down
+                <button className="tr-visit-close" onClick={() => sceneRef.current?.walk(false)} aria-label="Stop walking" title="Stop walking">
+                  ×
                 </button>
               </div>
             )}
@@ -246,10 +298,63 @@ export default function TowerRoom({ config, onLeave, onOpenMemories, explore = f
                 </button>
               </div>
             )}
-            {!step && !holding && !visiting && tip && <p className="tr-tip">Tap any glowing light to see what it does</p>}
+            {!step && !holding && !visiting && !walking && tip && <p className="tr-tip">Tap any glowing light to see what it does</p>}
           </div>
+          {walking && <WalkStick onMove={(x, y) => sceneRef.current?.setStick(x, y)} />}
         </>
       )}
+    </div>
+  );
+}
+
+// The spells the wand can cast ("own" is each thing's own magic)
+const SPELLS = [
+  ["own", "Its own magic"],
+  ["leviosa", "Wingardium Leviosa"],
+  ["accio", "Accio"],
+  ["engorgio", "Engorgio"],
+  ["reducio", "Reducio"],
+  ["colovaria", "Colovaria"],
+  ["incendio", "Incendio"],
+];
+
+// An on-screen stick for walking on touch screens: push it the way you want
+// to go (up is forwards).
+function WalkStick({ onMove }) {
+  const [knob, setKnob] = useState({ x: 0, y: 0 });
+  const active = useRef(false);
+  function move(e) {
+    const rect = e.currentTarget.getBoundingClientRect();
+    const r = rect.width / 2;
+    let x = (e.clientX - rect.left - r) / r;
+    let y = (e.clientY - rect.top - r) / r;
+    const len = Math.hypot(x, y);
+    if (len > 1) {
+      x /= len;
+      y /= len;
+    }
+    setKnob({ x, y });
+    onMove(x, -y);
+  }
+  function stop() {
+    active.current = false;
+    setKnob({ x: 0, y: 0 });
+    onMove(0, 0);
+  }
+  return (
+    <div
+      className="tr-stick"
+      aria-hidden="true"
+      onPointerDown={(e) => {
+        active.current = true;
+        e.currentTarget.setPointerCapture(e.pointerId);
+        move(e);
+      }}
+      onPointerMove={(e) => active.current && move(e)}
+      onPointerUp={stop}
+      onPointerCancel={stop}
+    >
+      <span className="tr-stick-knob" style={{ transform: `translate(${knob.x * 34}px, ${knob.y * 34}px)` }} />
     </div>
   );
 }

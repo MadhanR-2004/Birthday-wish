@@ -3,7 +3,7 @@ import { onWall } from "./roomProps.js";
 import { random } from "./roomTextures.js";
 
 // The magical things in the tower room: the fireplace (fire, smoke, sparks),
-// potions that bubble, a portrait that watches you, a Chocolate Frog, the
+// a portrait that watches you, the
 // Marauder's Map and a wand, plus the moonbeam and soft contact shadows. Interactive things return a "prop"
 // in the same shape as roomProps.js.
 
@@ -251,84 +251,6 @@ export function buildFireplace(scene, mats, tex, sparks, angle) {
   };
 }
 
-// ---------- potion bottles, on the mantel ----------
-
-function liquidMaterial(color) {
-  return new THREE.ShaderMaterial({
-    uniforms: { uTime: { value: 0 }, uBoil: { value: 0 }, uColor: { value: new THREE.Color(color) } },
-    vertexShader: `varying vec3 vPos; void main() { vPos = position; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
-    fragmentShader: /* glsl */ `
-      uniform float uTime;
-      uniform float uBoil;
-      uniform vec3 uColor;
-      varying vec3 vPos;
-      ${NOISE}
-      void main() {
-        float a = atan(vPos.x, vPos.z);
-        vec2 p = vec2(a * 2.0, vPos.y * 40.0 - uTime * (1.5 + uBoil * 6.0));
-        float bubbles = smoothstep(0.72 - uBoil * 0.15, 0.9, noise(p * vec2(3.0, 1.0)));
-        float swirl = fbm(vec2(a * 1.5 + uTime * 0.3, vPos.y * 20.0 - uTime * 0.5));
-        vec3 c = uColor * (0.45 + 0.6 * swirl) + vec3(1.0) * bubbles * 0.55;
-        c += uColor * (0.35 + uBoil * 1.6);
-        gl_FragColor = vec4(c, 1.0);
-        #include <colorspace_fragment>
-      }`,
-  });
-}
-
-export function buildPotions(fireplace, mats) {
-  const root = new THREE.Group();
-  root.position.set(-0.58, 1.48, 0.28);
-  fireplace.root.add(root);
-  const glass = new THREE.MeshPhysicalMaterial({ color: 0xdfe8ee, roughness: 0.05, transparent: true, opacity: 0.28, depthWrite: false, clearcoat: 1 });
-  const cork = new THREE.MeshStandardMaterial({ color: 0x8a6a42, roughness: 0.9 });
-  const bottles = [
-    { x: 0, shape: [[0, 0], [0.045, 0], [0.05, 0.02], [0.05, 0.1], [0.02, 0.14], [0.014, 0.18], [0, 0.18]], fill: 0.1, color: 0x2bd37a },
-    { x: 0.12, shape: [[0, 0], [0.035, 0], [0.04, 0.05], [0.032, 0.09], [0.01, 0.15], [0.01, 0.2], [0, 0.2]], fill: 0.09, color: 0x9b4dff },
-    { x: 0.23, shape: [[0, 0], [0.04, 0], [0.04, 0.08], [0.012, 0.11], [0.012, 0.15], [0, 0.15]], fill: 0.075, color: 0xffa21a },
-  ];
-  const liquids = [];
-  for (const b of bottles) {
-    const g = new THREE.Group();
-    g.position.x = b.x;
-    root.add(g);
-    const inner = b.shape.filter(([, y]) => y <= b.fill).map(([r, y]) => [r * 0.88, y + 0.003]);
-    inner.push([0, b.fill]);
-    const liquid = add(g, lathe(inner), liquidMaterial(b.color), 0, 0, 0, { cast: false });
-    liquids.push(liquid.material);
-    const shell = add(g, lathe(b.shape), glass, 0, 0, 0, { cast: false });
-    shell.renderOrder = 3;
-    const top = b.shape[b.shape.length - 2];
-    add(g, new THREE.CylinderGeometry(top[0] * 1.15, top[0], 0.025, 10), cork, 0, top[1] + 0.005, 0);
-    const glow = new THREE.PointLight(b.color, 0.05, 0.8, 2);
-    glow.position.y = 0.06;
-    g.add(glow);
-    liquids[liquids.length - 1].glow = glow;
-  }
-  root.updateWorldMatrix(true, true);
-  let boil = 0;
-  return {
-    key: "potions",
-    title: "Potion bottles",
-    text: "Something green, something violet and something amber that smells faintly of toffee.",
-    root,
-    focus: { position: root.localToWorld(v3(0.1, 0.15, 0.9)), target: root.localToWorld(v3(0.12, 0.08, 0)) },
-    colliders: [],
-    actions: [{ id: "boil", label: "Warm them up" }],
-    act() {
-      boil = 1;
-    },
-    update(dt, t) {
-      boil = Math.max(0, boil - dt * 0.18);
-      for (const m of liquids) {
-        m.uniforms.uTime.value = t;
-        m.uniforms.uBoil.value = boil;
-        m.glow.intensity = 0.05 + boil * 0.6;
-      }
-    },
-  };
-}
-
 // ---------- a portrait whose eyes follow you ----------
 
 export function buildPortrait(parent, mats, { x = 0, y = 0, z = 0, rotY = 0, scale = 1, frame = null, w = 0.5, h = 0.64, sepia = 0, bg = 0x1f3a2c, robe = 0x5a1218, title, text }) {
@@ -443,71 +365,6 @@ export function buildPortrait(parent, mats, { x = 0, y = 0, z = 0, rotY = 0, sca
         mat.uniforms.uBlink.value = k < 1 ? Math.sin(Math.PI * k) : 0;
         if (k >= 1) blinkAt = t + 2 + Math.random() * 5;
       }
-    },
-  };
-}
-
-// ---------- a Chocolate Frog that hops out of its box ----------
-
-export function buildChocolateFrog(fireplace, mats) {
-  const root = new THREE.Group();
-  root.position.set(0.45, 1.48, 0.3);
-  fireplace.root.add(root);
-  const purple = new THREE.MeshPhysicalMaterial({ color: 0x4a1d6e, roughness: 0.5, clearcoat: 0.4 });
-  const label = canvasTexture(128, 128, (c, w, h) => {
-    c.fillStyle = "#4a1d6e";
-    c.fillRect(0, 0, w, h);
-    c.fillStyle = "#e3b648";
-    c.beginPath();
-    for (let i = 0; i < 10; i++) {
-      const r = i % 2 ? 18 : 44;
-      const a = -Math.PI / 2 + (i * Math.PI) / 5;
-      c.lineTo(w / 2 + Math.cos(a) * r, h / 2 + Math.sin(a) * r);
-    }
-    c.fill();
-  });
-  add(root, new THREE.CylinderGeometry(0.06, 0.06, 0.05, 5), purple, 0, 0.025, 0);
-  const lidPivot = new THREE.Group();
-  lidPivot.position.set(0, 0.05, -0.05);
-  root.add(lidPivot);
-  add(lidPivot, new THREE.CylinderGeometry(0.063, 0.063, 0.012, 5), [purple, new THREE.MeshStandardMaterial({ map: label, roughness: 0.5 }), purple], 0, 0.006, 0.05);
-  // the frog: smooth glossy chocolate
-  const choc = new THREE.MeshPhysicalMaterial({ color: 0x4a2512, roughness: 0.35, clearcoat: 0.6 });
-  const frog = new THREE.Group();
-  root.add(frog);
-  add(frog, new THREE.SphereGeometry(1, 20, 14), choc, 0, 0.018, 0).scale.set(0.024, 0.016, 0.03);
-  add(frog, new THREE.SphereGeometry(1, 16, 12), choc, 0, 0.028, 0.022).scale.set(0.018, 0.012, 0.016);
-  for (const s of [-1, 1]) {
-    add(frog, new THREE.SphereGeometry(0.006, 10, 8), choc, s * 0.01, 0.038, 0.026);
-    add(frog, new THREE.CapsuleGeometry(0.006, 0.026, 4, 8), choc, s * 0.022, 0.008, -0.012).rotation.set(1.2, 0, s * 0.4);
-  }
-  root.updateWorldMatrix(true, true);
-  frog.position.y = 0.015;
-  frog.visible = false;
-  let hop = -1;
-  return {
-    key: "frog",
-    title: "Chocolate Frog",
-    text: "A box of chocolate with a jump in it. Better hold on tight.",
-    root,
-    focus: { position: root.localToWorld(v3(0, 0.15, 0.8)), target: root.localToWorld(v3(0, 0.03, 0)) },
-    colliders: [],
-    actions: [{ id: "open", label: "Open the box" }],
-    act() {
-      if (hop < 0) hop = 0;
-    },
-    update(dt) {
-      if (hop < 0) return;
-      hop += dt;
-      // lid opens, three hops out along the mantel, three hops back, lid shuts
-      lidPivot.rotation.x = -1.6 * ease(clamp01(hop / 0.4)) * (1 - ease(clamp01((hop - 4.6) / 0.4)));
-      const k = clamp01((hop - 0.4) / 4.0);
-      frog.visible = hop > 0.35 && hop < 4.5;
-      const out = k < 0.5 ? k * 2 : 2 - k * 2;
-      const hops = k * 6;
-      frog.position.set(-out * 0.32, 0.015 + Math.abs(Math.sin(Math.PI * hops)) * 0.06 + (1 - Math.min(1, out * 6)) * 0.03, 0.03 * Math.sin(Math.PI * out));
-      frog.rotation.y = k < 0.5 ? -Math.PI / 2 : Math.PI / 2;
-      if (hop > 5.1) hop = -1;
     },
   };
 }

@@ -1,5 +1,7 @@
 import * as THREE from "three";
 import { RoundedBoxGeometry } from "three/examples/jsm/geometries/RoundedBoxGeometry.js";
+import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
+import { buildQuillModel, buildInkBottle } from "./quillModel.js";
 import { random, parchment } from "./roomTextures.js";
 
 // The furniture and objects of the tower room, each built from simple shapes.
@@ -410,16 +412,13 @@ export function buildDesk(scene, mats, tex, { name }) {
   const paperMat = new THREE.MeshStandardMaterial({ map: sheet.texture, roughness: 0.92 });
   const paper = add(root, new THREE.PlaneGeometry(0.3, 0.41), paperMat, -0.15, 0.7765, 0.06, { cast: false });
   paper.rotation.set(-Math.PI / 2, 0, 0.12);
-  // ink bottle
-  add(root, new THREE.CylinderGeometry(0.03, 0.035, 0.06, 20), mats.inkGlass, 0.25, 0.805, -0.1);
-  add(root, new THREE.CylinderGeometry(0.014, 0.016, 0.02, 14), mats.inkGlass, 0.25, 0.843, -0.1);
-  // the quill (a long feather on a shaft), standing in the ink
-  const quill = new THREE.Group();
+  // the ink bottle, and the quill standing in it (its nib in the ink)
+  const ink = buildInkBottle(mats.brass);
+  ink.position.set(0.25, 0.775, -0.1);
+  root.add(ink);
+  const quill = buildQuillModel();
   root.add(quill);
-  add(quill, new THREE.CylinderGeometry(0.0018, 0.0012, 0.3, 6), mats.quillShaft, 0, 0.15, 0, { cast: false });
-  const vane = add(quill, new THREE.PlaneGeometry(0.045, 0.21), mats.quillVane, 0.012, 0.19, 0);
-  vane.rotation.y = 0.4;
-  const rest = { pos: v3(0.25, 0.8, -0.1), rot: new THREE.Euler(0.25, 0, -0.32) };
+  const rest = { pos: v3(0.25, 0.79, -0.1), rot: new THREE.Euler(0.25, 0, -0.32) };
   quill.position.copy(rest.pos);
   quill.rotation.copy(rest.rot);
 
@@ -673,6 +672,39 @@ export function buildCage(scene, mats) {
 
 // ---------- bookshelf, with books that can be taken out ----------
 
+// A bound book as one mesh, standing up with its spine towards +z:
+// boards that overhang the pages, a gently rounded spine with raised bands,
+// and the page block set in between. Material groups: 0 boards, 1 pages,
+// 2 spine, 3 bands.
+export function bookGeometry(bw, bh, bd) {
+  const board = Math.min(0.0032, bw * 0.12);
+  const r = bw / 2;
+  const bulge = 0.42; // how round the spine is
+  const spineZ = bd / 2 - r * bulge;
+  const parts = [];
+  const flat = (g) => (g.index ? g.toNonIndexed() : g);
+  // the two boards
+  for (const sx of [-1, 1]) parts.push([flat(new RoundedBoxGeometry(board, bh, bd - r * bulge, 2, board * 0.45)).translate(sx * (bw / 2 - board / 2), 0, -(r * bulge) / 2), 0]);
+  // the page block, set in from the edges
+  parts.push([flat(new THREE.BoxGeometry(bw - board * 2.2, bh - 0.007, bd - r * bulge - 0.004)).translate(0, 0, -(r * bulge) / 2 - 0.002), 1]);
+  // the rounded spine
+  parts.push([flat(new THREE.CylinderGeometry(r, r, bh, 18, 1, true, -Math.PI / 2, Math.PI)).scale(1, 1, bulge).translate(0, 0, spineZ), 2]);
+  // raised bands across the spine, near the head and tail
+  for (const y of [-0.36, 0.36]) parts.push([flat(new THREE.TorusGeometry(r, Math.min(0.0016, bh * 0.006), 4, 10, Math.PI).rotateX(Math.PI / 2).scale(1, 1, bulge)).translate(0, y * bh, spineZ), 3]);
+  const geo = mergeGeometries(parts.map(([g]) => g), true);
+  // put each part in its material group
+  let start = 0;
+  geo.clearGroups();
+  const counts = parts.map(([g, m]) => [g.attributes.position.count, m]);
+  const byMat = [[], [], [], []];
+  for (const [count, m] of counts) {
+    byMat[m].push([start, count]);
+    start += count;
+  }
+  for (let m = 0; m < 4; m++) for (const [st, count] of byMat[m]) geo.addGroup(st, count, m);
+  return geo;
+}
+
 export function buildBookshelf(scene, mats) {
   const root = new THREE.Group();
   root.position.set(3.45, 0, -1.2);
@@ -697,7 +729,11 @@ export function buildBookshelf(scene, mats) {
       if (rand() < 0.08) {
         // a few books lying flat in a stack
         const n = 2 + Math.floor(rand() * 3);
-        for (let i = 0; i < n; i++) box(root, 0.22, 0.04, 0.17, mats.bookCover[Math.floor(rand() * mats.bookCover.length)], x + 0.11, y + 0.02 + i * 0.041, 0.02).rotation.y = (rand() - 0.5) * 0.2;
+        for (let i = 0; i < n; i++) {
+          const v = Math.floor(rand() * mats.bookCover.length);
+          const flatBook = add(root, bookGeometry(0.038, 0.22, 0.17), [mats.bookCover[v], mats.pages, mats.bookSpine[v], mats.gilt], x + 0.11, y + 0.02 + i * 0.039, 0.02);
+          flatBook.rotation.set(0, (rand() - 0.5) * 0.2, Math.PI / 2);
+        }
         x += 0.25;
         continue;
       }
@@ -707,7 +743,7 @@ export function buildBookshelf(scene, mats) {
       if (x + bw > W / 2 - 0.04) break;
       const variant = Math.floor(rand() * mats.bookCover.length);
       const cover = mats.bookCover[variant];
-      const book = add(root, new THREE.BoxGeometry(bw, bh, bd), [cover, cover, mats.pages, cover, mats.bookSpine[variant], cover], x + bw / 2, y + bh / 2, -D / 2 + 0.04 + bd / 2);
+      const book = add(root, bookGeometry(bw, bh, bd), [cover, mats.pages, mats.bookSpine[variant], mats.gilt], x + bw / 2, y + bh / 2, -D / 2 + 0.04 + bd / 2);
       book.userData.book = true;
       books.push({ mesh: book, home: book.position.clone(), size: v3(bw, bh, bd), variant });
       x += bw + 0.002;

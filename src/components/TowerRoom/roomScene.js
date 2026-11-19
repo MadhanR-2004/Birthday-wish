@@ -10,7 +10,8 @@ import * as props from "./roomProps.js";
 import * as magic from "./roomMagic.js";
 import * as furniture from "./roomFurniture.js";
 import { createSpells } from "./roomSpells.js";
-import * as extras from "./roomExtras.js";
+import { buildSnitch } from "./roomExtras.js";
+import * as crafted from "./roomCrafted.js";
 import { buildGryffindorBanner } from "./roomBanners.js";
 import { loadRoomAssets, surfaceMaterial } from "./roomAssets.js";
 import { createGuidedCamera } from "./guidedCamera.js";
@@ -104,8 +105,8 @@ function makeMaterials(tex, surfaces) {
     wax2: phys({ color: 0x8e0f1c, roughness: 0.35, clearcoat: 0.6 }),
     flame: props.flameMaterial(),
     glass: phys({ map: tex.glass, color: 0x9fb0c8, transparent: true, roughness: 0.12, metalness: 0, envMapIntensity: 0.3, side: THREE.DoubleSide, depthWrite: false }),
-    bookCover: covers.map(([r, g, b]) => phys({ color: new THREE.Color(r, g, b), roughness: 0.6, sheen: 0.4 })),
-    bookSpine: tex.spines.map((map) => std({ map, roughness: 0.55 })),
+    bookCover: covers.map(([r, g, b]) => phys({ color: new THREE.Color(r, g, b), roughness: 0.6, sheen: 0.4, normalMap: tiledCopy(surfaces.leather.normalMap, 0.6), normalScale: new THREE.Vector2(0.6, 0.6) })),
+    bookSpine: tex.spines.map((map) => std({ map, roughness: 0.55, normalMap: tiledCopy(surfaces.leather.normalMap, 0.5), normalScale: new THREE.Vector2(0.4, 0.4) })),
     pages: std({ color: 0xe8dcc0, roughness: 0.95 }),
     pageSheet: std({
       side: THREE.DoubleSide,
@@ -129,31 +130,6 @@ function makeMaterials(tex, surfaces) {
       }),
     }),
     wandWood: std({ color: 0x3a2214, roughness: 0.4 }),
-    inkGlass: phys({ color: 0x141a26, roughness: 0.08, metalness: 0, clearcoat: 1, transparent: true, opacity: 0.88 }),
-    quillShaft: std({ color: 0xe8e2d4, roughness: 0.5 }),
-    quillVane: std({
-      side: THREE.DoubleSide,
-      alphaTest: 0.5,
-      roughness: 0.8,
-      map: paintedTexture(64, 256, (c, w, h) => {
-        c.fillStyle = "#f2efe6";
-        c.beginPath();
-        c.moveTo(w / 2, 0);
-        c.quadraticCurveTo(w, h * 0.3, w * 0.55, h);
-        c.lineTo(w * 0.45, h);
-        c.quadraticCurveTo(0, h * 0.3, w / 2, 0);
-        c.fill();
-        c.strokeStyle = "rgba(120, 110, 100, 0.4)";
-        for (let y = 6; y < h; y += 4) {
-          c.beginPath();
-          c.moveTo(w / 2, y);
-          c.lineTo(4, y + 10);
-          c.moveTo(w / 2, y);
-          c.lineTo(w - 4, y + 10);
-          c.stroke();
-        }
-      }),
-    }),
     rug: std({ map: tex.rug, roughness: 0.97 }),
     straw: std({ map: tex.straw, roughness: 0.9 }),
   };
@@ -222,8 +198,8 @@ export async function createRoomScene(host, options = {}) {
   const sparks = magic.createSparks(scene);
   const fireplace = magic.buildFireplace(scene, mats, tex, sparks, -2.05);
   furniture.dressFireplace(fireplace, models);
-  const potions = magic.buildPotions(fireplace, mats);
-  const frog = magic.buildChocolateFrog(fireplace, mats);
+  const potions = crafted.buildPotions(fireplace, mats, sparks);
+  const frog = crafted.buildChocolateFrog(fireplace, mats, sparks);
   const chess = furniture.buildFireside(scene, models, sparks);
   const portrait = magic.buildPortrait(scene, mats, {
     ...props.onWall(0.98, 0.04, 1.75),
@@ -240,12 +216,13 @@ export async function createRoomScene(host, options = {}) {
   const moonbeam = magic.buildMoonbeam(scene, moonDir);
   // the mirror's mist writing and the quill's paper butterflies
   const spells = createSpells(scene, camera, sparks, { name, reduceMotion });
-  // a golden snitch, moving photos of the two of you, and a music box
-  const snitch = extras.buildSnitch(scene, camera, sparks);
-  const photos = extras.buildPhotoWall(scene, mats, sparks, options.photos ?? []);
-  const musicBox = extras.buildMusicBox(scene, mats, sparks);
-  const added = [snitch, musicBox, ...(photos ? [photos] : [])];
-  magic.buildContactShadows(scene, [
+  // a golden snitch, a gramophone for your favourite songs and a mandrake that sings
+  const snitch = buildSnitch(scene, camera, sparks);
+  const gramophone = crafted.buildGramophone(scene, models, mats, sparks, { favourites: options.favourites ?? [] });
+  const mandrake = crafted.buildMandrake(scene, models, sparks, { songUrl: options.song });
+  const added = [snitch, gramophone, mandrake];
+  // the furniture's footprints on the floor: [x, z, width, depth, turn]
+  const FOOTPRINTS = [
     [-2.85, 0.35, 2.9, 2.0],
     [-1.5, 0.35, 0.8, 1.2],
     [0, -3.2, 1.8, 1.0],
@@ -256,7 +233,23 @@ export async function createRoomScene(host, options = {}) {
     [-3.3, -1.75, 1.9, 0.9, -2.05],
     [-2.15, -1.05, 1.0, 1.0],
     [-1.45, -1.75, 0.7, 0.6],
-  ]);
+  ];
+  magic.buildContactShadows(scene, FOOTPRINTS);
+  // where you can stand when walking about: inside the walls, and not in
+  // any furniture (with a little room to spare)
+  const BLOCKED = [...FOOTPRINTS, [2.2, -1.4, 0.72, 0.72], [1.05, -2.35, 0.5, 0.5]];
+  function canStand(x, z) {
+    if (Math.hypot(x, z) > R - 0.45) return false;
+    const m = 0.22;
+    for (const [bx, bz, w, d, rot = 0] of BLOCKED) {
+      const dx = x - bx;
+      const dz = z - bz;
+      const u = dx * Math.cos(rot) - dz * Math.sin(rot);
+      const v = dx * Math.sin(rot) + dz * Math.cos(rot);
+      if (Math.abs(u) < w / 2 + m && Math.abs(v) < d / 2 + m) return false;
+    }
+    return true;
+  }
 
   // the window: opens for the owl, and then however you like
   let windowOpen = false;
@@ -336,7 +329,9 @@ export async function createRoomScene(host, options = {}) {
   function flightPlan(points, speed, accel, decel) {
     const curve = new THREE.CatmullRomCurve3(points, false, "centripetal");
     const length = curve.getLength();
-    const duration = accel / 2 + decel / 2 + (length - (speed * accel) / 2 - (speed * decel) / 2) / speed;
+    // cruising time, plus the whole of the speeding-up and slowing-down time
+    // (so the path is always flown all the way to its end)
+    const duration = length / speed + accel / 2 + decel / 2;
     const distAt = (t) => {
       t = clamp(t, 0, duration);
       const cruise = duration - accel - decel;
@@ -357,8 +352,9 @@ export async function createRoomScene(host, options = {}) {
   // through the opening...
   const WINDOW_IN = v3(0, 1.82, -3.55);
   const outside = flightPlan([v3(1.6, 3.4, -24), v3(0.7, 2.6, -13), v3(0.1, 2.0, -6.5), v3(0, 1.85, -4.6), WINDOW_IN], 3.0, 0.8, 0);
-  // ...then, once inside, she flies straight to you. That path is worked out
-  // as she comes in, from wherever you happen to be looking.
+  // ...then, once inside, she flies all the way across to you, slowing
+  // gently as she arrives. That path is worked out as she comes in, from
+  // wherever you happen to be looking.
   let toYou = null;
   const hover = v3(0.2, 1.52, 1.6);
   function planToYou() {
@@ -370,6 +366,7 @@ export async function createRoomScene(host, options = {}) {
     for (const box of colliders) if (box.containsPoint(hover)) hover.y = Math.max(hover.y, box.max.y + 0.4);
     const mid = WINDOW_IN.clone().lerp(hover, 0.5).add(v3(0.35, 0.22, 0));
     toYou = flightPlan([WINDOW_IN, mid, hover.clone()], 3.0, 0, 1.5);
+    story.hoverT = 0;
   }
   // ...and, once you've taken the letter, round the room and up onto her cage
   const lineUp = cageTop.clone().addScaledVector(toRoom, 1.8).add(v3(0, 0.35, 0));
@@ -524,10 +521,17 @@ export async function createRoomScene(host, options = {}) {
       case "hovering":
       case "giving": {
         // hovering in front of you, the letter swinging from her talons
-        const drift = reduceMotion ? 0 : Math.sin(t * 0.6) * 0.05;
+        // (the drift starts from where she arrived, so there's no jump)
+        story.hoverT = (story.hoverT ?? 0) + dt;
+        const settle = 1 - Math.exp(-dt * 4);
+        const drift = reduceMotion ? 0 : Math.sin(story.hoverT * 0.6) * 0.05 * smooth(0, 1.5, story.hoverT);
         owl.root.position.set(hover.x + drift, hover.y + (reduceMotion ? 0 : Math.sin(owl.phase ?? 0) * -0.012), hover.z);
         const turn = wrapAngle(facingCamera - owl.root.rotation.y);
-        owl.root.rotation.set(-0.08, owl.root.rotation.y + turn * (1 - Math.exp(-dt * 3)), -Math.cos(t * 0.6) * 0.04);
+        owl.root.rotation.set(
+          owl.root.rotation.x + (-0.08 - owl.root.rotation.x) * settle,
+          owl.root.rotation.y + turn * (1 - Math.exp(-dt * 3)),
+          owl.root.rotation.z + (-Math.sin(story.hoverT * 0.6) * 0.04 - owl.root.rotation.z) * settle,
+        );
         target.flapRate = 2.2;
         target.headYaw = headYawTowards(camera.position);
         if (story.phase === "hovering" && letter.parent === owl.root) letter.rotation.x = Math.PI / 2 - 0.15 + Math.sin(t * 1.7) * 0.06;
@@ -925,6 +929,18 @@ export async function createRoomScene(host, options = {}) {
       else if (stationOf(hit.prop.key)) setWand(true); // put it down by mistake: pick it back up
       return;
     }
+    // walking about: tap anything and its magic happens right where it is
+    if (guided.walking) {
+      if (!hit) return;
+      const { prop, object } = hit;
+      if (prop.key === "wand") return setWand(true);
+      if (prop.key === "letter") return options.onReadLetter?.();
+      const target = hit.hotspot ? (prop.key === "books" ? shelf.books[Math.floor(Math.random() * shelf.books.length)].mesh : prop.root) : object;
+      const [words, cast] = spellFor(prop, target);
+      onNarrate(words);
+      cast();
+      return;
+    }
     // exploring one thing: tap it again (as often as you like) to repeat
     // its magic; the × in the page takes you back to the whole room
     if (visit.prop) {
@@ -956,6 +972,12 @@ export async function createRoomScene(host, options = {}) {
     selectedKey = prop.key;
     onSelect(null);
     lookAtProp(prop);
+  }
+  function stopWalk() {
+    if (!guided.walking) return;
+    guided.stopWalking();
+    options.onWalk?.(false);
+    if (holding) setWand(false);
   }
   function endVisit() {
     if (!visit.prop) return;
@@ -1034,8 +1056,132 @@ export async function createRoomScene(host, options = {}) {
     renderer.domElement.style.cursor = on ? "crosshair" : "";
     if (on) {
       if (guide.active) guideDone("wand");
-      else goTo("overview");
+      else if (!guided.walking) goTo("overview");
     }
+    if (!on) setLumos(false);
+  }
+
+  // ---------- choosing a spell to cast, and Lumos on the wand's tip ----------
+
+  // "own" is each thing's own magic; the rest work on (almost) anything
+  const SPELLS = {
+    own: "",
+    leviosa: "Wingardium Leviosa!",
+    accio: "Accio!",
+    engorgio: "Engorgio!",
+    reducio: "Reducio!",
+    colovaria: "Colovaria!",
+    incendio: "Incendio!",
+  };
+  let spell = "own";
+  let lumos = false;
+  function setLumos(on) {
+    lumos = on;
+    options.onLumos?.(on);
+  }
+  // things that can't be lifted or moved (they're part of the walls, or alive)
+  const FIXED = new Set(["fireplace", "window", "mirror", "painting", "portrait-of-an-old-wizard", "owl", "letter", "snitch", "wand"]);
+  const tricks = new Map(); // object -> what a spell is doing to it
+  const colours = new Map(); // mesh -> its own material, while it's recoloured
+  function castSpell(kind, prop, object, point) {
+    const words = SPELLS[kind];
+    // the object to work on: a book from the shelf, otherwise the whole thing
+    let target = prop?.root;
+    if (prop?.key === "books" || prop?.key === "shelf") target = levitating(object) ?? shelf.books[Math.floor(Math.random() * shelf.books.length)].mesh;
+    if (!prop || !target) return [words, () => {}];
+    const movable = !FIXED.has(prop.key);
+    if (kind === "incendio")
+      return [words, () => {
+        tricks.set(target, { kind: "wiggle", t: 0, ...baseOf(target) });
+        fires.push({ at: point.clone(), t: 0 });
+      }];
+    if (kind === "colovaria") return [words, () => recolour(target)];
+    if (!movable) return [words, () => tricks.set(target, { kind: "wiggle", t: 0, ...baseOf(target) })];
+    if (kind === "leviosa" && levitating(object)) return [words, () => levitate(levitating(object))];
+    return [words, () => !tricks.has(target) && tricks.set(target, { kind, t: 0, ...baseOf(target) })];
+  }
+  const baseOf = (o) => ({ pos: o.position.clone(), rot: o.rotation.clone(), scale: o.scale.clone(), size: new THREE.Box3().setFromObject(o).getSize(new THREE.Vector3()) });
+  // Colovaria: every surface cycles through the rainbow for a while
+  function recolour(target) {
+    if ([...colours.values()].some((c) => c.target === target)) return;
+    target.traverse((o) => {
+      if (!o.isMesh || o.userData.hotspot || colours.has(o)) return;
+      const list = Array.isArray(o.material) ? o.material : [o.material];
+      if (!list.some((m) => m.color && !m.isShaderMaterial)) return;
+      colours.set(o, { target, own: o.material, t: 0, seed: Math.random() });
+      o.material = Array.isArray(o.material) ? o.material.map((m) => m.clone()) : o.material.clone();
+    });
+  }
+  const fires = [];
+  const tmpHSL = new THREE.Color();
+
+  function updateTricks(dt, t) {
+    for (const [o, k] of tricks) {
+      k.t += dt;
+      const end = k.kind === "wiggle" ? 0.7 : 4.2;
+      const env = k.kind === "wiggle" ? 1 : easeInOut(clamp01(k.t / 0.7)) * (1 - easeInOut(clamp01((k.t - (end - 0.9)) / 0.9)));
+      o.position.copy(k.pos);
+      o.rotation.copy(k.rot);
+      o.scale.copy(k.scale);
+      const big = Math.max(k.size.x, k.size.y, k.size.z);
+      if (k.kind === "wiggle") {
+        const w = Math.sin(k.t * 40) * 0.05 * (1 - k.t / end);
+        o.rotation.z += w;
+        o.rotation.x += w * 0.6;
+      } else if (k.kind === "leviosa") {
+        // float up (less for big things) and turn slowly in the air
+        const parentScale = o.parent.getWorldScale(tmpW).y || 1;
+        o.position.y += (env * (big > 1.2 ? 0.25 : 0.4) + Math.sin(t * 2.2) * 0.02 * env) / parentScale;
+        o.rotation.y += env * Math.sin(k.t * 1.2) * 0.5;
+        o.rotation.z += env * Math.sin(t * 1.7) * 0.08;
+      } else if (k.kind === "accio") {
+        // fly towards you (most of the way), wait a moment, then go back
+        const from = o.parent.localToWorld(tmpV.copy(k.pos));
+        const to = tmpW.copy(camera.position).add(new THREE.Vector3(0, -0.35, 0));
+        const gap = from.distanceTo(to);
+        const reach = Math.max(0, gap - (0.7 + big * 0.6)) / Math.max(gap, 1e-3);
+        from.lerp(to, reach * env);
+        from.y += Math.sin(env * Math.PI) * 0.15;
+        o.position.copy(o.parent.worldToLocal(from));
+        o.rotation.y += env * Math.sin(k.t * 3) * 0.3;
+      } else if (k.kind === "engorgio") {
+        o.scale.multiplyScalar(1 + env * (big > 1.2 ? 0.3 : 0.65) + Math.sin(k.t * 9) * 0.02 * env);
+      } else if (k.kind === "reducio") {
+        o.scale.multiplyScalar(1 - env * 0.55 + Math.sin(k.t * 9) * 0.02 * env);
+      }
+      if (k.t > end) {
+        o.position.copy(k.pos);
+        o.rotation.copy(k.rot);
+        o.scale.copy(k.scale);
+        tricks.delete(o);
+      }
+    }
+    for (const [mesh, c] of colours) {
+      c.t += dt;
+      const fade = clamp01(c.t / 0.5) * (1 - clamp01((c.t - 4) / 0.8));
+      const list = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+      const own = Array.isArray(c.own) ? c.own : [c.own];
+      list.forEach((m, i) => {
+        if (!m.color || !own[i]?.color) return;
+        tmpHSL.setHSL((t * 0.25 + c.seed) % 1, 0.85, 0.55);
+        m.color.copy(own[i].color).lerp(tmpHSL, fade * 0.85);
+        if (m.emissive) m.emissive.copy(tmpHSL).multiplyScalar(fade * 0.25);
+      });
+      if (c.t > 4.8) {
+        const made = mesh.material;
+        mesh.material = c.own;
+        (Array.isArray(made) ? made : [made]).forEach((m) => m.dispose());
+        colours.delete(mesh);
+      }
+    }
+    for (let i = fires.length - 1; i >= 0; i--) {
+      const f = fires[i];
+      f.t += dt;
+      if (Math.random() < dt * 60) sparks.burst(f.at, 2, [0xff5a1a, 0xffa030, 0xffe08a], { speed: 0.25, up: 1.0, spread: 0.4, life: 0.7, gravity: 0.6 });
+      if (f.t > 1.3) fires.splice(i, 1);
+    }
+    // Lumos: a bright light on the wand's tip
+    heldLight.distance = lumos ? 7 : 1.2;
   }
   for (const b of shelf.books) b.mesh.userData.levitate = true;
 
@@ -1096,7 +1242,7 @@ export async function createRoomScene(host, options = {}) {
       case "spectacles":
         return ["Oculus Reparo!", () => spectacles.act()];
       case "potions":
-        return ["Incendio!", () => potions.act()];
+        return [potions.nameFor(object), () => potions.act(null, object)];
       case "globe":
         return ["Spin!", () => globe.act()];
       case "desk":
@@ -1115,10 +1261,10 @@ export async function createRoomScene(host, options = {}) {
         return ["Good evening!", () => portrait.act()];
       case "snitch":
         return ["I open at the close.", () => snitch.act()];
-      case "photos":
-        return ["", () => photos.act(null, object)];
-      case "musicbox":
-        return ["", () => musicBox.act()];
+      case "mandrake":
+        return ["", () => mandrake.act()];
+      case "gramophone":
+        return [gramophone.nextTitle(), () => gramophone.act()];
       case "books":
         return ["Wingardium Leviosa!", () => levitate(object)];
       default:
@@ -1135,7 +1281,7 @@ export async function createRoomScene(host, options = {}) {
     flick = 1;
     beam(tipPos, point);
     const hitProp = hit ? propOf(hit.object) : null;
-    const [words, cast] = spellFor(hitProp, hit?.object);
+    const [words, cast] = guide.active || spell === "own" ? spellFor(hitProp, hit?.object) : castSpell(spell, hitProp, hit?.object, point);
     onNarrate(words);
     cast();
     guideDone(hitProp?.key);
@@ -1169,8 +1315,9 @@ export async function createRoomScene(host, options = {}) {
     flick = Math.max(0, flick - dt * 4);
     heldTilt.rotation.x = -1.42 + Math.sin(flick * Math.PI) * 0.3;
     heldWand.position.y = -0.13 + Math.sin(t * 1.3) * 0.003;
-    heldLight.intensity = 0.25 + flick * 1.5;
-    heldTipMat.color.setRGB(1.5 + flick * 2, 1.4 + flick * 1.6, 1.1 + flick);
+    heldLight.intensity = (lumos ? 4 : 0.25) + flick * 1.5;
+    heldTipMat.color.setRGB(1.5 + flick * 2 + (lumos ? 2 : 0), 1.4 + flick * 1.6 + (lumos ? 2 : 0), 1.1 + flick + (lumos ? 1.6 : 0));
+    updateTricks(dt, t);
   }
 
   // ---------- post-processing: hover outline and candle glow ----------
@@ -1276,6 +1423,7 @@ export async function createRoomScene(host, options = {}) {
       if (!holding) onSelect(infoFor(prop));
     },
     replay() {
+      stopWalk();
       Object.assign(visit, { prop: null, object: null, stage: null });
       options.onVisit?.(null);
       setWand(false);
@@ -1292,6 +1440,33 @@ export async function createRoomScene(host, options = {}) {
     // while looking at one thing: do its magic again, or go back to the room
     again: () => visit.stage === "there" && visitMagic(),
     leaveVisit: () => endVisit(),
+    // walk about the room (only once the story's over), or stop and go
+    // back to the view of the whole room
+    walk(on) {
+      if (on) {
+        if (guide.active || guided.walking) return;
+        if (visit.prop) {
+          Object.assign(visit, { prop: null, object: null, stage: null });
+          selectedKey = null;
+          options.onVisit?.(null);
+        }
+        guided.startWalking(canStand);
+        options.onWalk?.(true);
+        if (!holding) setWand(true); // you carry the wand as you walk
+      } else if (guided.walking) {
+        stopWalk();
+        goTo("overview");
+      }
+    },
+    setStick: (x, y) => guided.setStick(x, y),
+    // which spell the wand casts ("own" = each thing's own magic)
+    setSpell(key) {
+      if (key in SPELLS) spell = key;
+    },
+    lumos(on) {
+      setLumos(on);
+      onNarrate(on ? "Lumos!" : "Nox!");
+    },
     // pick what to enchant next (from the story's choices)
     choose(key) {
       if (!guide.active || !["choose", "cast"].includes(guide.phase) || !stationOf(key)) return;
@@ -1318,7 +1493,9 @@ export async function createRoomScene(host, options = {}) {
       renderer.domElement.removeEventListener("pointerup", onPointerUp);
       guided.dispose();
       owl.dispose();
-      musicBox.dispose();
+      gramophone.dispose();
+      mandrake.dispose();
+      crafted.closeRoomAudio();
       const textures = new Set();
       scene.traverse((o) => {
         o.geometry?.dispose();

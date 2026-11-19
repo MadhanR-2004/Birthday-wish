@@ -5,6 +5,13 @@ import * as THREE from "three";
 // like turning your head), zoom in a touch with the wheel, and glide smoothly
 // to other viewpoints. You never end up inside a wall or a piece of furniture,
 // because every viewpoint is chosen by hand.
+//
+// Or you can walk around: drag to look any way you like, and move with the
+// keys (W A S D or the arrows) or an on-screen stick. canStand(x, z) says
+// where there's room to stand, so you slide along walls and furniture.
+
+const EYE = 1.55; // eye height when walking
+const SPEED = 1.5; // metres a second
 
 const ease = (t) => (t < 0.5 ? 4 * t * t * t : 1 - (-2 * t + 2) ** 3 / 2);
 const clamp = (x, a, b) => Math.min(Math.max(x, a), b);
@@ -17,9 +24,10 @@ export function createGuidedCamera(camera, dom, { reduceMotion = false } = {}) {
   let glide = null;
   let drag = null;
   let moved = 0;
+  const walk = { on: false, pos: new THREE.Vector3(), yaw: 0, pitch: 0, vel: new THREE.Vector3(), keys: new Set(), stick: { x: 0, y: 0 }, canStand: () => true, bob: 0 };
 
   function onPointerDown(e) {
-    drag = { x: e.clientX, y: e.clientY, yaw: look.yawGoal, pitch: look.pitchGoal };
+    drag = { x: e.clientX, y: e.clientY, lastX: e.clientX, lastY: e.clientY, yaw: look.yawGoal, pitch: look.pitchGoal };
     moved = 0;
     dom.setPointerCapture?.(e.pointerId);
   }
@@ -31,6 +39,14 @@ export function createGuidedCamera(camera, dom, { reduceMotion = false } = {}) {
     const dx = e.clientX - drag.x;
     const dy = e.clientY - drag.y;
     moved = Math.max(moved, Math.hypot(dx, dy));
+    if (walk.on) {
+      // walking: turn freely, all the way round
+      walk.yaw -= (e.clientX - drag.lastX) * 0.005;
+      walk.pitch = clamp(walk.pitch - (e.clientY - drag.lastY) * 0.004, -1.0, 1.0);
+      drag.lastX = e.clientX;
+      drag.lastY = e.clientY;
+      return;
+    }
     look.yawGoal = clamp(drag.yaw + dx * 0.0035, -look.range.yaw, look.range.yaw);
     look.pitchGoal = clamp(drag.pitch + dy * 0.0028, -look.range.pitch, look.range.pitch);
   }
@@ -46,11 +62,29 @@ export function createGuidedCamera(camera, dom, { reduceMotion = false } = {}) {
   dom.addEventListener("pointerup", onPointerUp);
   dom.addEventListener("pointercancel", onPointerUp);
   dom.addEventListener("wheel", onWheel, { passive: false });
+  // walking keys
+  const KEYS = { w: "f", arrowup: "f", s: "b", arrowdown: "b", a: "l", arrowleft: "l", d: "r", arrowright: "r" };
+  const typing = (e) => /input|textarea|select/i.test(e.target?.tagName ?? "");
+  function onKeyDown(e) {
+    const k = KEYS[e.key.toLowerCase()];
+    if (!walk.on || !k || typing(e)) return;
+    walk.keys.add(k);
+    e.preventDefault();
+  }
+  function onKeyUp(e) {
+    const k = KEYS[e.key.toLowerCase()];
+    if (k) walk.keys.delete(k);
+  }
+  window.addEventListener("keydown", onKeyDown);
+  window.addEventListener("keyup", onKeyUp);
+  const onBlur = () => walk.keys.clear();
+  window.addEventListener("blur", onBlur);
 
   const dir = new THREE.Vector3();
   const up = new THREE.Vector3(0, 1, 0);
   const right = new THREE.Vector3();
   const lookAt = new THREE.Vector3();
+  const step = new THREE.Vector3();
 
   return {
     // was the last press a drag (so it shouldn't count as a click)?
@@ -59,6 +93,33 @@ export function createGuidedCamera(camera, dom, { reduceMotion = false } = {}) {
     },
     get busy() {
       return !!glide;
+    },
+    get walking() {
+      return walk.on;
+    },
+    // start walking from wherever the camera is now, looking the same way
+    startWalking(canStand) {
+      walk.on = true;
+      walk.canStand = canStand ?? (() => true);
+      glide = null;
+      walk.pos.set(camera.position.x, EYE, camera.position.z);
+      camera.getWorldDirection(dir);
+      walk.yaw = Math.atan2(dir.x, dir.z);
+      walk.pitch = clamp(Math.asin(clamp(dir.y, -1, 1)), -0.5, 0.5);
+      walk.vel.set(0, 0, 0);
+      walk.keys.clear();
+      walk.stick.x = walk.stick.y = 0;
+      zoom.goal = 60;
+    },
+    stopWalking() {
+      walk.on = false;
+      walk.keys.clear();
+      walk.stick.x = walk.stick.y = 0;
+    },
+    // the on-screen stick: x to the right, y forwards, each -1..1
+    setStick(x, y) {
+      walk.stick.x = x;
+      walk.stick.y = y;
     },
     // jump straight to a view
     set(view) {
@@ -99,6 +160,34 @@ export function createGuidedCamera(camera, dom, { reduceMotion = false } = {}) {
           glide = null;
         }
         camera.lookAt(lookAt);
+      } else if (walk.on) {
+        // where you want to go: forwards/backwards and sideways
+        const fwd = (walk.keys.has("f") ? 1 : 0) - (walk.keys.has("b") ? 1 : 0) + walk.stick.y;
+        const side = (walk.keys.has("r") ? 1 : 0) - (walk.keys.has("l") ? 1 : 0) + walk.stick.x;
+        const len = Math.hypot(fwd, side);
+        const sx = Math.sin(walk.yaw);
+        const sz = Math.cos(walk.yaw);
+        step.set(0, 0, 0);
+        if (len > 0.05) {
+          const k = Math.min(1, len) / len;
+          // forwards is where you're facing; right is a quarter turn clockwise
+          step.set((sx * fwd - sz * side) * k, 0, (sz * fwd + sx * side) * k).multiplyScalar(SPEED);
+        }
+        walk.vel.lerp(step, 1 - Math.exp(-dt * 8));
+        // move, sliding along anything in the way
+        const nx = walk.pos.x + walk.vel.x * dt;
+        const nz = walk.pos.z + walk.vel.z * dt;
+        if (walk.canStand(nx, nz)) walk.pos.set(nx, EYE, nz);
+        else if (walk.canStand(nx, walk.pos.z)) walk.pos.x = nx;
+        else if (walk.canStand(walk.pos.x, nz)) walk.pos.z = nz;
+        // a gentle bob as you walk
+        const speed = Math.hypot(walk.vel.x, walk.vel.z);
+        walk.bob += dt * speed * 6.5;
+        camera.position.copy(walk.pos);
+        if (!reduceMotion) camera.position.y += Math.sin(walk.bob) * 0.012 * Math.min(1, speed / SPEED);
+        dir.set(Math.sin(walk.yaw) * Math.cos(walk.pitch), Math.sin(walk.pitch), Math.cos(walk.yaw) * Math.cos(walk.pitch));
+        lookAt.copy(camera.position).addScaledVector(dir, 2);
+        camera.lookAt(lookAt);
       } else {
         const f = 1 - Math.exp(-dt * 6);
         // gentle head-turn towards the mouse, on top of any dragging
@@ -134,6 +223,9 @@ export function createGuidedCamera(camera, dom, { reduceMotion = false } = {}) {
       dom.removeEventListener("pointerup", onPointerUp);
       dom.removeEventListener("pointercancel", onPointerUp);
       dom.removeEventListener("wheel", onWheel);
+      window.removeEventListener("keydown", onKeyDown);
+      window.removeEventListener("keyup", onKeyUp);
+      window.removeEventListener("blur", onBlur);
     },
   };
 }
