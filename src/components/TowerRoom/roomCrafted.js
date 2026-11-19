@@ -1427,3 +1427,134 @@ export function buildPotions(fireplace, mats, sparks) {
     },
   };
 }
+
+// ======================= the gilded painting with hidden pictures =======================
+
+// Poly Haven's carved, gilded frame and its old painting. Cast Revelio at it
+// and the paint burns away from a glowing golden edge to show your first
+// picture; again for the second; a third time and the painting comes back.
+// pictures: two image URLs.
+export function buildRevealPainting(scene, models, sparks, { angle = 1.25, pictures = [] } = {}) {
+  const R = 4.2;
+  const root = new THREE.Group();
+  root.position.set(Math.sin(angle) * (R - 0.012), 1.62, Math.cos(angle) * (R - 0.012)); // flat against the wall
+  root.rotation.y = angle + Math.PI; // facing into the room
+  root.scale.setScalar(1.3);
+  scene.add(root);
+  const frame = models.fancy_picture_frame_02.clone();
+  root.add(frame);
+  const canvasMesh = frame.getObjectByName("fancy_picture_frame_02_canvas");
+  const painting = canvasMesh.material.map;
+  const CANVAS_ASPECT = 0.392 / 0.5;
+
+  const loader = new THREE.TextureLoader();
+  const blank = new THREE.Texture();
+  // the painting is made for this canvas, so it fills it exactly; photos are cropped to fit
+  const aspects = [CANVAS_ASPECT, 1, 1];
+  const textures = [painting ?? blank];
+  pictures.slice(0, 2).forEach((url, i) => {
+    const t = loader.load(url, (tex) => {
+      aspects[i + 1] = tex.image.width / tex.image.height;
+      mat.uniforms.uAspect.value.set(aspects[mat.userData.from] ?? 1, aspects[mat.userData.to] ?? 1);
+    });
+    t.colorSpace = THREE.SRGBColorSpace;
+    t.flipY = false; // the same way up as the model's own painting
+    t.anisotropy = 8;
+    textures.push(t);
+  });
+
+  const mat = new THREE.ShaderMaterial({
+    uniforms: {
+      uFrom: { value: textures[0] },
+      uTo: { value: textures[0] },
+      uAspect: { value: new THREE.Vector2(CANVAS_ASPECT, CANVAS_ASPECT) },
+      uCanvas: { value: CANVAS_ASPECT },
+      uProgress: { value: 1 },
+      uTime: { value: 0 },
+    },
+    vertexShader: `varying vec2 vUv; void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
+    fragmentShader: /* glsl */ `
+      uniform sampler2D uFrom, uTo;
+      uniform vec2 uAspect;
+      uniform float uCanvas, uProgress, uTime;
+      varying vec2 vUv;
+      float hash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+      float noise(vec2 p) {
+        vec2 i = floor(p), f = fract(p);
+        f = f * f * (3.0 - 2.0 * f);
+        return mix(mix(hash(i), hash(i + vec2(1, 0)), f.x), mix(hash(i + vec2(0, 1)), hash(i + vec2(1, 1)), f.x), f.y);
+      }
+      float fbm(vec2 p) { float s = 0.0, a = 0.5; for (int i = 0; i < 5; i++) { s += a * noise(p); p *= 2.03; a *= 0.5; } return s; }
+      // fill the canvas with a picture, cropping (not stretching) it
+      vec2 cover(vec2 uv, float aspect) {
+        vec2 s = aspect > uCanvas ? vec2(uCanvas / aspect, 1.0) : vec2(1.0, aspect / uCanvas);
+        return (uv - 0.5) * s + 0.5;
+      }
+      void main() {
+        vec3 a = texture2D(uFrom, cover(vUv, uAspect.x)).rgb;
+        vec3 b = texture2D(uTo, cover(vUv, uAspect.y)).rgb;
+        // the paint burns away from the middle outwards, along a ragged edge
+        float n = fbm(vUv * vec2(5.0, 6.4)) * 0.6 + length(vUv - 0.5) * 0.9;
+        float edge = uProgress * 1.35 - 0.1;
+        float shown = smoothstep(edge, edge - 0.03, n);
+        vec3 col = mix(a, b, shown);
+        // a glowing, flickering golden edge where it's burning
+        float rim = smoothstep(0.07, 0.0, abs(n - edge)) * step(0.001, uProgress) * step(uProgress, 0.999);
+        col += vec3(1.6, 1.05, 0.45) * rim * (0.8 + 0.2 * sin(uTime * 30.0 + n * 40.0));
+        // old varnish and a soft vignette, as if it's all one painting
+        col *= 1.0 - 0.35 * pow(length(vUv - 0.5) * 1.3, 2.0);
+        gl_FragColor = vec4(col * 0.78, 1.0); // about as bright as the lamplit room
+        #include <colorspace_fragment>
+      }`,
+  });
+  mat.userData = { from: 0, to: 0 };
+  canvasMesh.material = mat;
+
+  let showing = 0; // 0 the painting, 1 the first picture, 2 the second
+  let progress = 1;
+  const glowAt = v3();
+  return {
+    key: "painting",
+    title: "Gilded painting",
+    text: "An old painting in a carved, gilded frame. They say something is hidden beneath the paint.",
+    root,
+    focus: {
+      position: v3(Math.sin(angle) * (R - 1.55), 1.62, Math.cos(angle) * (R - 1.55)),
+      target: v3(Math.sin(angle) * (R - 0.05), 1.62, Math.cos(angle) * (R - 0.05)),
+    },
+    colliders: [],
+    actions: [{ id: "reveal", label: "Revelio" }],
+    // the next thing it will show, for the spell's words
+    get revealsPicture() {
+      return (showing + 1) % 3 !== 0;
+    },
+    act() {
+      if (progress < 1) return; // let the last reveal finish
+      const next = (showing + 1) % Math.max(1, textures.length);
+      mat.userData = { from: showing, to: next };
+      mat.uniforms.uFrom.value = textures[showing];
+      mat.uniforms.uTo.value = textures[next];
+      mat.uniforms.uAspect.value.set(aspects[showing] ?? 1, aspects[next] ?? 1);
+      showing = next;
+      progress = 0;
+      root.localToWorld(glowAt.set(0, 0, 0.05));
+      sparks.burst(glowAt, 40, [0xffe7a0, 0xffd36a, 0xffffff], { speed: 0.5, up: 0.3, life: 1.2, gravity: -0.4 });
+    },
+    update(dt, t) {
+      mat.uniforms.uTime.value = t;
+      if (progress < 1) {
+        progress = Math.min(1, progress + dt / 2.6);
+        mat.uniforms.uProgress.value = progress;
+        // embers drifting off the burning edge
+        if (Math.random() < dt * 25) {
+          root.localToWorld(glowAt.set((Math.random() - 0.5) * 0.36 * progress, (Math.random() - 0.5) * 0.46 * progress, 0.03));
+          sparks.burst(glowAt, 1, [0xffd36a, 0xffa040, 0xffffff], { speed: 0.08, up: 0.2, life: 0.9, gravity: 0.1 });
+        }
+        if (progress >= 1) {
+          mat.uniforms.uFrom.value = textures[showing];
+          mat.uniforms.uAspect.value.x = aspects[showing] ?? 1;
+        }
+      }
+    },
+  };
+}

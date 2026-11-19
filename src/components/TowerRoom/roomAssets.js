@@ -25,6 +25,7 @@ export const MODELS = [
   "vintage_oil_lamp",
   "throw_pillows_01",
   "potted_plant_02",
+  "fancy_picture_frame_02",
 ];
 
 // scanned surfaces: diffuse colour, normal and roughness maps

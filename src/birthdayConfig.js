@@ -35,6 +35,13 @@ export const BIRTHDAY = {
   // and it sings Happy Birthday instead.
   song: "",
 
+  // Two pictures hidden under the gilded painting in the tower room: cast
+  // Revelio at it and the paint burns away to show the first, then the
+  // second. Leave it empty and it uses the first two memory pictures.
+  hiddenPictures: [
+    // "memories/our-first-photo.jpg", "memories/our-favourite-photo.jpg",
+  ],
+
   // The gramophone in the tower room plays your favourite songs: each tap
   // (or spell) puts on the next one, and after the last it stops. Put the
   // files in the "public/songs" folder and list them here. With none, it

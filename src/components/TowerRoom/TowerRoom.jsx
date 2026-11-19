@@ -54,6 +54,10 @@ export default function TowerRoom({ config, onLeave, onOpenMemories, explore = f
           owlName,
           withBasin: !!onOpenMemories,
           song: config.song ? `${import.meta.env.BASE_URL}${config.song.replace(/^\//, "")}` : "",
+          // two pictures hidden under the gilded painting (by default, the first two memory pictures)
+          hiddenPictures: (config.hiddenPictures?.length ? config.hiddenPictures : (config.memories ?? []).flatMap((m) => m.pictures ?? []))
+            .slice(0, 2)
+            .map((f) => `${import.meta.env.BASE_URL}${f.replace(/^\//, "")}`),
           favourites: (config.favourites ?? []).filter((f) => f?.file).map((f) => ({ title: f.title ?? "", url: `${import.meta.env.BASE_URL}${f.file.replace(/^\//, "")}` })),
           explore,
           reduceMotion: window.matchMedia("(prefers-reduced-motion: reduce)").matches,

@@ -14,3 +14,4 @@ domain): free to use for anything, no credit required.
 - Lighting: fireplace (HDRI)
 - More models: potted_plant_02 (the mandrake's pot and leaves) and the
   scanned gold of pocket_watch (the golden snitch)
+- fancy_picture_frame_02 (the gilded painting with the hidden pictures)

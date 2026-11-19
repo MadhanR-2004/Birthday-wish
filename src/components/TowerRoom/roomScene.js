@@ -189,7 +189,8 @@ export async function createRoomScene(host, options = {}) {
   const cage = props.buildCage(scene, mats);
   const shelf = props.buildBookshelf(scene, mats);
   const candles = props.buildFloatingCandles(scene, mats, flickers);
-  const painting = props.buildPainting(scene, mats, 1.25);
+  // the gilded painting, with your two pictures hidden under the paint
+  const painting = crafted.buildRevealPainting(scene, models, sparks, { angle: 1.25, pictures: options.hiddenPictures ?? [] });
   const broom = furniture.buildBroomModel(scene, models, -0.42);
   const letter = props.buildLetter(scene, mats, tex, { name });
   furniture.buildChandelier(scene, models, mats, flickers);
@@ -1256,7 +1257,7 @@ export async function createRoomScene(host, options = {}) {
       case "frog":
         return ["Ribbit!", () => frog.act()];
       case "painting":
-        return ["Ventus!", () => painting.act()];
+        return ["Revelio!", () => painting.act()];
       case "portrait-of-an-old-wizard":
         return ["Good evening!", () => portrait.act()];
       case "snitch":
